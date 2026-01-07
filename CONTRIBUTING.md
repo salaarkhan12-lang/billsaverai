@@ -11,7 +11,7 @@ Thank you for your interest in contributing to BillSaver! This document provides
 ```bash
 # Fork the repository on GitHub
 # Then clone your fork
-git clone https://github.com/YOUR_USERNAME/billsaver.git
+git clone https://github.com/salaarkhan12-lang/billsaver.git
 cd billsaver
 ```
 
