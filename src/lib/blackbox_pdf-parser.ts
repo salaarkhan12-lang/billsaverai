@@ -48,13 +48,11 @@ async function extractTextWithOCR(file: File, pageCount: number, onProgress?: (p
       isEvalSupported: false,
     }).promise;
 
-    // Create Tesseract worker with detailed logging and explicit CDN paths
+    // Create Tesseract worker with detailed logging
+    // Note: Using default paths for langPath (unpkg.com) which is more reliable
     console.log("📝 Initializing Tesseract OCR worker...");
     try {
       worker = await createWorker('eng', 1, {
-        workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-        langPath: 'https://cdn.jsdelivr.net/npm/tessdata-fast@4.1.0',
-        corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
         logger: (m) => {
           const progress = m.progress ? Math.round(m.progress * 100) : 0;
           console.log(`   OCR Worker: ${m.status} ${m.progress ? `(${progress}%)` : ''}`);
