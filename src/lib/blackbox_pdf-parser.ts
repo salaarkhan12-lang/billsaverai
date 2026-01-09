@@ -53,7 +53,7 @@ async function extractTextWithOCR(file: File, pageCount: number, onProgress?: (p
     try {
       worker = await createWorker('eng', 1, {
         workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
-        langPath: 'https://cdn.jsdelivr.net/npm/tessdata-fast@4.1/4.1',
+        langPath: 'https://cdn.jsdelivr.net/npm/tessdata-fast@4.1.0',
         corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
         logger: (m) => {
           const progress = m.progress ? Math.round(m.progress * 100) : 0;
