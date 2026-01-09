@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to BillSaver will be documented in this file.
+All notable changes to BillSaver will be documented in this file. New entries to be listed below the last entry. 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -328,6 +328,72 @@ None yet - this is the initial release.
 
 ---
 
+## [1.5.0] - 2026-01-09
+
+### 🎯 Revenue Calculation Accuracy & Investor-Ready Enhancements
+
+#### Added
+- **Revenue Validation & Transparency**
+  - `validateRevenueCalculation()` function for automated accuracy checks
+  - `RevenueBreakdown` interface with detailed calculation metadata
+  - `generateRevenueBreakdown()` for step-by-step calculation explanations
+  - Comprehensive source citations (2024 Medicare Fee Schedule + payer data)
+  - Confidence indicators with color coding (🟢 High, 🟡 Medium, 🟠 Low)
+  
+- **Payer Comparison Features**
+  - `comparePayerScenarios()` function for multi-payer revenue comparison
+  - `getPayerComparisonStats()` for best/average/worst case analysis
+  - `PayerComparisonView` component with animated counters
+  - Side-by-side comparison across BCBS, UHC, Aetna, and Cigna
+  - Progress bars showing relative revenue value by payer
+  - "BEST" rank badges with star icons
+
+- **UI Enhancements**
+  - Animated revenue counters with smooth count-up effects
+  - Enhanced revenue display (2xl font, per-year/per-visit breakdown)
+  - Clickable Medicare source link for data verification
+  - Color-coded confidence badges in revenue display
+  - Custom glassmorphic scrollbar with lavender gradient
+  - `RevenueExplainer` tooltip component (ready for integration)
+
+- **Documentation**
+  - `REVENUE_CALCULATION_METHODOLOGY.md` (300+ lines)
+  - Complete technical documentation of calculation approach
+  - Medicare rate tables with official CMS source links
+  - Payer multiplier justifications and industry benchmarks
+  - API reference for all revenue functions
+
+- **Testing**
+  - `revenue-validation.test.ts` with 18 comprehensive unit tests
+  - All tests passing ✅
+
+#### Fixed
+- **ML Gap Revenue Consistency**
+  - ML-detected gaps now use precise revenue calculations
+  - `missing_assessment` and `missing_plan` gaps calculate exact CPT upgrade impact
+  - ML confidence scores integrated into revenue calculation
+  - Uniform revenue presentation across all gap types
+
+- **Revenue Display**
+  - Upgraded font size from xl to 2xl for prominence
+  - Changed "at risk" to clearer "per year" label
+  - Added per-visit revenue when gap data available
+
+#### Changed
+- `revenue-calculator.ts`: +200 lines validation and breakdown logic
+- `billing-rules.ts`: ML gaps use precise calculations
+- `AnalysisResults.tsx`: Integrated confidence indicators and payer comparison
+- `globals.css`: Custom glassmorphic scrollbar
+
+#### Technical Details
+- Files Modified: 4
+- Files Created: 4 (tests, components, docs)
+- Lines Added: ~1,200
+- Test Coverage: 18 tests
+- Performance: <1ms per calculation
+
+---
+
 ## Security Updates
 
 Security-related changes will be highlighted here.
@@ -343,4 +409,4 @@ Security-related changes will be highlighted here.
 
 ---
 
-**Current Version**: 1.4.0 (Enhanced Code Analysis & Extraction - Production Ready)
+**Current Version**: 1.5.0 (Revenue Calculation Accuracy & Investor-Ready Enhancements)

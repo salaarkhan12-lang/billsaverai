@@ -7,7 +7,9 @@ import { GapList } from "./GapList";
 import { ProviderApprovalPanel } from "./ProviderApprovalPanel";
 import { PDFViewer } from "./PDFViewer";
 import { RecommendedBillingCodes } from "./billing/RecommendedBillingCodes";
+import { PayerComparisonView } from "./PayerComparisonView";
 import type { AnalysisResult, DocumentationGap as Gap } from "@/lib/billing-rules";
+import { comparePayerScenarios } from "@/lib/revenue-calculator";
 import { cn } from "@/lib/cn";
 import { useEffect, useState } from "react";
 import { saveToHistory } from "@/lib/history-storage";
@@ -152,9 +154,99 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
                     {result.documentationLevel} Note
                   </div>
                   <div className="h-px w-full bg-white/10 my-2" />
-                  <div className="text-white/50 text-xs uppercase tracking-wider">Revenue Impact</div>
-                  <div className="text-red-400 font-mono font-bold text-xl">
-                    {result.totalPotentialRevenueLoss} <span className="text-xs text-white/40 font-sans font-normal">at risk</span>
+                  <div className="text-white/50 text-xs uppercase tracking-wider mb-2">Revenue Impact</div>
+
+                  {/* Enhanced Revenue Display */}
+                  <div className="space-y-2">
+                    {/* Annual Revenue - Primary (Most Impressive) */}
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-red-400 font-mono font-bold text-2xl">
+                        {result.totalPotentialRevenueLoss}
+                      </div>
+                      <span className="text-xs text-white/40 font-sans">per year</span>
+                    </div>
+
+                    {/* Per-Visit Revenue - Show if we have detailed gap data */}
+                    {result.gaps.some(g => g.revenueImpact) && (
+                      <>
+                        <div className="flex items-baseline gap-2">
+                          <div className="text-red-300 font-mono text-sm">
+                            ~${Math.round(
+                              result.gaps
+                                .filter(g => g.revenueImpact)
+                                .reduce((sum, g) => sum + (g.revenueImpact?.perVisitGap || 0), 0)
+                            ).toLocaleString()}
+                          </div>
+                          <span className="text-xs text-white/40 font-sans">per visit</span>
+                        </div>
+
+                        {/* Confidence Indicator - NEW! */}
+                        {(() => {
+                          // Calculate average confidence from gaps with revenue impact
+                          const gapsWithConfidence = result.gaps.filter(g => g.revenueImpact?.confidence);
+                          if (gapsWithConfidence.length > 0) {
+                            const avgConfidence = gapsWithConfidence.reduce(
+                              (sum, g) => sum + (g.revenueImpact?.confidence || 0),
+                              0
+                            ) / gapsWithConfidence.length;
+
+                            const confidencePercent = Math.round(avgConfidence * 100);
+                            const confidenceLevel = avgConfidence >= 0.75 ? 'high' : avgConfidence >= 0.50 ? 'medium' : 'low';
+                            const confidenceColor = {
+                              high: 'text-emerald-400',
+                              medium: 'text-yellow-400',
+                              low: 'text-orange-400'
+                            }[confidenceLevel];
+
+                            return (
+                              <div className={cn("flex items-center gap-1.5 text-xs", confidenceColor)}>
+                                <div className="flex items-center gap-1">
+                                  {confidenceLevel === 'high' && (
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                  {confidenceLevel === 'medium' && (
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <circle cx="10" cy="10" r="8" opacity="0.5" />
+                                    </svg>
+                                  )}
+                                  {confidenceLevel === 'low' && (
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                  <span className="capitalize">{confidenceLevel} confidence</span>
+                                </div>
+                                <span className="opacity-60">({confidencePercent}%)</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </>
+                    )}
+
+                    {/* Source Data Link - NEW! */}
+                    <div className="pt-1 space-y-1">
+                      <a
+                        href="https://www.cms.gov/medicare/payment/fee-schedules/physician"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 group w-fit"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span className="group-hover:underline">2024 Medicare Fee Schedule</span>
+                        <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                      <div className="text-xs text-white/40 opacity-60">
+                        Based on CMS national averages + commercial payer rates
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -206,6 +298,28 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
                 }}
               />
             </div>
+
+            {/* Payer Comparison Section - NEW! */}
+            {result.gaps.some(g => g.revenueImpact) && (() => {
+              // Get a gap with revenue impact to use for comparison
+              const gapWithRevenue = result.gaps.find(g => g.revenueImpact);
+              if (gapWithRevenue?.revenueImpact) {
+                const comparison = comparePayerScenarios(
+                  gapWithRevenue.revenueImpact.currentLevel.cptCode,
+                  gapWithRevenue.revenueImpact.potentialLevel.cptCode,
+                  ['bcbs-national', 'uhc-national', 'aetna-national', 'cigna-national'],
+                  52, // visits per year
+                  gapWithRevenue.revenueImpact.confidence
+                );
+
+                return (
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+                    <PayerComparisonView comparisons={comparison} />
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         );
       case 'details':

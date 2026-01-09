@@ -766,6 +766,44 @@ export async function analyzeDocument(
       const gapCategory = mlGap.severity === 'high' ? 'critical' :
         mlGap.severity === 'medium' ? 'major' : 'moderate';
 
+      // Calculate precise revenue impact based on gap type
+      let revenueCalc: RevenueCalculation | undefined;
+      let revenueLossString = '$50-$200/visit (estimated)'; // Fallback
+
+      // Map ML gap types to revenue calculations when applicable
+      if (mlGap.gapType === 'missing_assessment' || mlGap.gapType === 'inadequate_assessment') {
+        // Assessment gaps typically affect ability to bill at higher E/M levels
+        // Conservative estimate: missing assessment prevents 99214, so stuck at 99213
+        try {
+          revenueCalc = calculateRevenue({
+            currentCPT: '99213',
+            potentialCPT: '99214',
+            payerId,
+            visitsPerYear,
+            confidence: mlGap.probability, // Use ML confidence
+          });
+          revenueLossString = toLegacyRevenueString(revenueCalc);
+        } catch (error) {
+          // Fall back to estimate if calculation fails
+          console.warn('Revenue calculation failed for ML gap:', error);
+        }
+      } else if (mlGap.gapType === 'missing_plan' || mlGap.gapType === 'inadequate_plan') {
+        // Plan gaps also affect E/M level eligibility
+        try {
+          revenueCalc = calculateRevenue({
+            currentCPT: '99213',
+            potentialCPT: '99214',
+            payerId,
+            visitsPerYear,
+            confidence: mlGap.probability,
+          });
+          revenueLossString = toLegacyRevenueString(revenueCalc);
+        } catch (error) {
+          console.warn('Revenue calculation failed for ML gap:', error);
+        }
+      }
+      // Add more gap type mappings as needed
+
       gaps.push({
         id: `ml_${mlGap.gapType}_${Date.now()}`,
         category: gapCategory as 'critical' | 'major' | 'moderate' | 'minor',
@@ -773,7 +811,8 @@ export async function analyzeDocument(
         description: `ML analysis detected potential issue: ${mlGap.gapType}`,
         impact: 'ML-enhanced gap detection for improved documentation quality',
         recommendation: mlGap.suggestedFix,
-        potentialRevenueLoss: '$50-$200/visit (estimated)',
+        potentialRevenueLoss: revenueLossString, // Now uses calculated value when possible
+        revenueImpact: revenueCalc, // NEW: Include precise calculation
         mlConfidence: mlGap.probability,
         isMLDetected: true,
       });

@@ -24,3 +24,64 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ============================================================================
+   CUSTOM GLASSMORPHIC SCROLLBAR
+   Matches the app's dark glassmorphic design aesthetic
+   ============================================================================ */
+
+/* Scrollbar track (the background) */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: linear-gradient(180deg,
+      rgba(139, 92, 246, 0.25) 0%,
+      rgba(167, 139, 250, 0.35) 50%,
+      rgba(139, 92, 246, 0.25) 100%);
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow:
+    inset 0 0 15px rgba(139, 92, 246, 0.2),
+    0 0 8px rgba(139, 92, 246, 0.15);
+}
+
+/* Scrollbar thumb (the draggable part) */
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg,
+      rgba(99, 102, 241, 0.3) 0%,
+      rgba(139, 92, 246, 0.3) 100%);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+/* Scrollbar thumb on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg,
+      rgba(99, 102, 241, 0.5) 0%,
+      rgba(139, 92, 246, 0.5) 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+/* Scrollbar thumb when active (being dragged) */
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(135deg,
+      rgba(99, 102, 241, 0.7) 0%,
+      rgba(139, 92, 246, 0.7) 100%);
+}
+
+/* Scrollbar corner (where horizontal and vertical scrollbars meet) */
+::-webkit-scrollbar-corner {
+  background: rgba(10, 10, 15, 0.3);
+}
+
+/* Firefox scrollbar support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.3) rgba(10, 10, 15, 0.3);
+}

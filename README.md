@@ -7,7 +7,7 @@
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8?style=flat-square&logo=tailwind-css)
 ![AWS](https://img.shields.io/badge/AWS-HIPAA%20Compliant-orange?style=flat-square&logo=amazon-aws)
-![Status](https://img.shields.io/badge/Status-v1.4.0%20Enhanced%20Analysis-success?style=flat-square)
+![Status](https://img.shields.io/badge/Status-v1.5.0%20Revenue%20Accuracy-success?style=flat-square)
 ![Security](https://img.shields.io/badge/Security-OWASP%202024-green?style=flat-square&logo=security)
 
 ---
@@ -37,8 +37,10 @@ npm run dev
 ### 🎯 Core Capabilities
 - **E/M Level Assessment** - Determines supported E/M level based on MDM complexity
 - **HCC Gap Detection** - Identifies missing MEAT criteria for chronic conditions
-- **Revenue Impact Analysis** - Calculates potential revenue loss from documentation gaps
-- **Comprehensive Scoring** - 100-point documentation quality score
+- **Revenue Impact Analysis** - Precise calculations with multi-payer comparison
+- **Revenue Validation & Transparency** - Automated accuracy checks with source citations
+- **Payer Comparison** - Side-by-side revenue comparison across major insurers (BCBS, UHC, Aetna, Cigna)
+- **Comprehensive Scoring** - 100-point documentation quality score with confidence indicators
 - **Billing Code Intelligence** - Advanced CPT and ICD-10 code extraction and validation
 - **API Testing Interface** - Programmatic testing capabilities for automated workflows
 
@@ -57,7 +59,7 @@ npm run dev
 - Beautiful glassmorphic UI with smooth animations
 - Drag-and-drop PDF upload
 - Real-time progress tracking
-- Interactive results dashboard
+- Interactive results dashboard with confidence badges
 - Expandable gap cards with recommendations
 - Color-coded severity indicators
 - Fully responsive (mobile, tablet, desktop)
@@ -96,7 +98,7 @@ npm run dev
 - **Code Analysis**: @lowlysre/icd-10-cm, compromise, fuse.js
 - **Utilities**: clsx, tailwind-merge
 
-### Backend Infrastructure (Phase 3)
+### Backend Infrastructure (Planned - Future Release)
 - **Cloud Platform**: AWS (HIPAA Compliant)
 - **Container Orchestration**: ECS Fargate
 - **Database**: PostgreSQL with KMS encryption
@@ -124,7 +126,7 @@ npm run dev
 
 ## 🔒 Privacy & Security
 
-### Enhanced Security (v2.1.0)
+### Enhanced Security
 - ✅ **Memory-Only Storage** - Zero PHI persistence to disk (HIPAA compliant)
 - ✅ **Session Management** - In-memory sessions with CSRF protection
 - ✅ **Content Security Policy** - Strict CSP prevents XSS/injection attacks
@@ -140,13 +142,13 @@ npm run dev
 - ✅ **HIPAA-Friendly** - Suitable for PHI with proper safeguards
 - ✅ **Secure by Design** - Defense-in-depth security architecture
 
-### Backend Infrastructure (Phase 3)
-- ✅ **HIPAA-Compliant Cloud** - AWS infrastructure with full HIPAA compliance
-- ✅ **End-to-End Encryption** - KMS encryption for all data at rest and in transit
-- ✅ **Zero-Trust Security** - VPC isolation, WAF protection, security groups
-- ✅ **Audit Logging** - CloudTrail comprehensive activity tracking
-- ✅ **Encrypted Backups** - Cross-region automated backups with compliance locks
-- ✅ **Access Controls** - Role-based access with least-privilege permissions
+### Backend Infrastructure (Planned)
+- 🔜 **HIPAA-Compliant Cloud** - AWS infrastructure with full HIPAA compliance
+- 🔜 **End-to-End Encryption** - KMS encryption for all data at rest and in transit
+- 🔜 **Zero-Trust Security** - VPC isolation, WAF protection, security groups
+- 🔜 **Audit Logging** - CloudTrail comprehensive activity tracking
+- 🔜 **Encrypted Backups** - Cross-region automated backups with compliance locks
+- 🔜 **Access Controls** - Role-based access with least-privilege permissions
 
 📖 **Full Security Documentation**: [SECURITY.md](SECURITY.md)
 🧪 **Security Testing**: [SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md)
@@ -337,7 +339,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and roadmap.
 
-**Current Version: 1.4.0 (Enhanced Code Analysis & Extraction) (Production Ready)**
+**Current Version: 1.5.0 (Revenue Calculation Accuracy & Investor-Ready Enhancements)**
 
 ---
 
@@ -374,14 +376,14 @@ This project is for educational and internal use. Ensure compliance with healthc
 
 ## 🎉 Status
 
-✅ **v2.1.0 Security Hardening Complete**  
+✅ **v1.5.0 - Revenue Calculation Accuracy & Investor-Ready**  
 ✅ **HIPAA-Compliant with Zero PHI Persistence**  
 ✅ **OWASP 2024 Security Standards**  
-✅ **Content Security Policy Enforced**  
-✅ **All 7 Critical Vulnerabilities Fixed**  
-✅ **Memory-Only PHI Storage**  
+✅ **Multi-Payer Revenue Comparison**  
+✅ **Validated Revenue Calculations**  
+✅ **Comprehensive Documentation (300+ pages)**  
 ✅ **Production Ready**  
-✅ **All Tests Passing**  
+✅ **All Tests Passing (18 revenue tests)**  
 ✅ **TypeScript Strict Mode**  
 ✅ **Zero Build Errors**  
 ✅ **Fully Documented**
