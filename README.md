@@ -7,7 +7,8 @@
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8?style=flat-square&logo=tailwind-css)
 ![AWS](https://img.shields.io/badge/AWS-HIPAA%20Compliant-orange?style=flat-square&logo=amazon-aws)
-![Status](https://img.shields.io/badge/Status-Phase%203%20Encrypted%20Database%20Ready-success?style=flat-square)
+![Status](https://img.shields.io/badge/Status-v1.4.0%20Enhanced%20Analysis-success?style=flat-square)
+![Security](https://img.shields.io/badge/Security-OWASP%202024-green?style=flat-square&logo=security)
 
 ---
 
@@ -36,6 +37,8 @@ npm run dev
 - **HCC Gap Detection** - Identifies missing MEAT criteria for chronic conditions
 - **Revenue Impact Analysis** - Calculates potential revenue loss from documentation gaps
 - **Comprehensive Scoring** - 100-point documentation quality score
+- **Billing Code Intelligence** - Advanced CPT and ICD-10 code extraction and validation
+- **API Testing Interface** - Programmatic testing capabilities for automated workflows
 
 ### 🔍 Smart Detection
 - ✅ Chief Complaint validation
@@ -45,6 +48,8 @@ npm run dev
 - ✅ MEAT criteria compliance
 - ✅ Time documentation tracking
 - ✅ Diagnosis specificity checking
+- ✅ CPT code extraction and categorization
+- ✅ ICD-10 code validation and conflict detection
 
 ### 🎨 User Experience
 - Beautiful glassmorphic UI with smooth animations
@@ -85,7 +90,8 @@ npm run dev
 - **UI Library**: React 19.2
 - **Styling**: Tailwind CSS 4.0
 - **Animations**: Framer Motion 12.23
-- **PDF Processing**: PDF.js 5.4
+- **PDF Processing**: PDF.js 4.4
+- **Code Analysis**: @lowlysre/icd-10-cm, compromise, fuse.js
 - **Utilities**: clsx, tailwind-merge
 
 ### Backend Infrastructure (Phase 3)
@@ -116,11 +122,21 @@ npm run dev
 
 ## 🔒 Privacy & Security
 
+### Enhanced Security (v2.1.0)
+- ✅ **Memory-Only Storage** - Zero PHI persistence to disk (HIPAA compliant)
+- ✅ **Session Management** - In-memory sessions with CSRF protection
+- ✅ **Content Security Policy** - Strict CSP prevents XSS/injection attacks
+- ✅ **Security Headers** - X-Frame-Options, HSTS, nosniff, and more
+- ✅ **Input Validation** - Magic byte checking, rate limiting, size limits
+- ✅ **Strong Encryption** - 500,000 PBKDF2 iterations (OWASP 2024)
+- ✅ **No Tracking** - Zero analytics, zero third-party scripts
+- ✅ **Auto Cleanup** - All data cleared on page unload
+
 ### Client-Side Mode (Default)
 - ✅ **100% Client-Side Processing** - No data sent to servers
-- ✅ **No Data Storage** - Files processed in browser memory only
-- ✅ **No Tracking** - No analytics or user tracking
-- ✅ **HIPAA-Friendly** - Suitable for PHI when used locally
+- ✅ **Zero Disk Persistence** - Files processed in volatile memory only
+- ✅ **HIPAA-Friendly** - Suitable for PHI with proper safeguards
+- ✅ **Secure by Design** - Defense-in-depth security architecture
 
 ### Backend Infrastructure (Phase 3)
 - ✅ **HIPAA-Compliant Cloud** - AWS infrastructure with full HIPAA compliance
@@ -129,6 +145,9 @@ npm run dev
 - ✅ **Audit Logging** - CloudTrail comprehensive activity tracking
 - ✅ **Encrypted Backups** - Cross-region automated backups with compliance locks
 - ✅ **Access Controls** - Role-based access with least-privilege permissions
+
+📖 **Full Security Documentation**: [SECURITY.md](SECURITY.md)
+🧪 **Security Testing**: [SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md)
 
 ---
 
@@ -316,7 +335,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and roadmap.
 
-**Current Version: 2.0.0 (Phase 3: Encrypted Database) (Production Ready)
+**Current Version: 1.4.0 (Enhanced Code Analysis & Extraction) (Production Ready)**
 
 ---
 
@@ -353,10 +372,12 @@ This project is for educational and internal use. Ensure compliance with healthc
 
 ## 🎉 Status
 
-✅ **Phase 3 Encrypted Database Ready**  
-✅ **HIPAA-Compliant Cloud Infrastructure**  
-✅ **End-to-End Encryption for PHI Data**  
-✅ **Encrypted Backup & Recovery System**  
+✅ **v2.1.0 Security Hardening Complete**  
+✅ **HIPAA-Compliant with Zero PHI Persistence**  
+✅ **OWASP 2024 Security Standards**  
+✅ **Content Security Policy Enforced**  
+✅ **All 7 Critical Vulnerabilities Fixed**  
+✅ **Memory-Only PHI Storage**  
 ✅ **Production Ready**  
 ✅ **All Tests Passing**  
 ✅ **TypeScript Strict Mode**  
@@ -387,11 +408,3 @@ This project is for educational and internal use. Ensure compliance with healthc
 **Built with ❤️ for healthcare providers**
 
 *Stop leaving money on the table. Optimize your documentation today.*
-### ?? Advanced AI Intelligence (v1.2.0)
-- **Client-Side ML Models** - TensorFlow.js powered analysis
-- **Enhanced Gap Detection** - ML identifies subtle documentation issues
-- **Quality Prediction** - AI predicts documentation scores
-- **CPT Code Intelligence** - ML recognizes labs, imaging, procedures
-- **Smart Templates** - AI-powered template suggestions
-- **Adaptive Learning** - Models improve with user feedback
-- **Offline Processing** - Zero external data transmission

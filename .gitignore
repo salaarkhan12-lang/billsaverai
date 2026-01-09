@@ -24,6 +24,32 @@ node_modules
 .DS_Store
 *.pem
 
+# Test scripts and temporary files
+test-*.js
+test-*.html
+temp_*.txt
+debug-*.js
+
+# Backup files
+*.backup
+*.legacy.ts
+*.old
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS specific files
+Thumbs.db
+
+# Build artifacts
+dist/
+
+# Test coverage
+coverage/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
