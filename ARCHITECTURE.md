@@ -316,22 +316,43 @@ resource "aws_wafv2_web_acl" "main" {
 
 ### Security Measures
 
-#### Client-Side
+#### Client-Side Security (Enhanced 2026)
 ```typescript
-// 1. File Type Validation
-if (file.type !== "application/pdf") {
-  // Reject non-PDF files
+// 1. File Type Validation with Magic Bytes
+if (!await validateFile(file)) {
+  // Reject invalid files (magic byte verification)
 }
 
-// 2. Client-Side Only Processing
-// All analysis happens in browser
-// No API calls, no data transmission
+// 2. Memory-Only Processing
+// All analysis happens in browser memory
+// No localStorage/sessionStorage for PHI
+// Automatic cleanup on page unload
 
-// 3. No Data Persistence
-// Files processed in memory
-// No localStorage, no cookies
-// State cleared on reset
+// 3. Session Management
+// In-memory sessions with CSRF protection
+// 30min idle timeout, 8hr absolute timeout
+// Session fingerprinting for hijacking detection
+
+// 4. Input Validation
+// Magic byte checking, not just extensions
+// Rate limiting (10 uploads/minute)
+// File size limits (50MB maximum)
 ```
+
+#### Content Security Policy
+- ✅ **Strict CSP**: Prevents XSS, code injection, clickjacking
+- ✅ **Nonce-based Scripts**: Inline scripts require cryptographic nonce
+- ✅ **frame-ancestors 'none'**: Complete clickjacking protection
+- ✅ **object-src 'none'**: Disables plugins and Flash
+- ✅ **Trusted Sources**: Only approved domains for resources
+
+#### HTTP Security Headers
+- ✅ **X-Frame-Options: DENY**: Prevents embedding in iframes
+- ✅ **X-Content-Type-Options: nosniff**: Prevents MIME sniffing
+- ✅ **Strict-Transport-Security**: HSTS with 1-year max-age
+- ✅ **Referrer-Policy**: Limits referrer information leakage
+- ✅ **Permissions-Policy**: Disables camera, microphone, geolocation
+- ✅ **CORP/COEP/COOP**: Cross-origin isolation
 
 #### Backend Security
 - ✅ **End-to-End Encryption**: TLS 1.2+ for all connections
@@ -403,6 +424,215 @@ const [isExpanded, setIsExpanded] = useState(false);
 const particlesRef = useRef<Particle[]>([]);
 const animationRef = useRef<number>();
 const mouseRef = useRef({ x: 0, y: 0 });
+```
+
+---
+
+## 🔧 Extraction Engine Architecture
+
+### Modular Design
+
+The extraction engine uses a plugin-based architecture for extensibility:
+
+```
+ExtractionEngine (Core Orchestrator)
+├── DocumentPreprocessor (Text normalization)
+│   ├── Noise removal (headers, footers, artifacts)
+│   ├── Text standardization (spacing, line breaks)
+│   └── Encoding normalization
+├── SectionDetector (Document structure analysis)
+│   ├── Section identification (HPI, ROS, Assessment, Plan, etc.)
+│   ├── Section boundary detection
+│   └── Hierarchical section mapping
+├── EntityExtractor (Medical entity recognition)
+│   ├── Diagnosis extraction
+│   ├── Procedure identification
+│   ├── Medication detection
+│   └── Lab/imaging recognition
+├── ContextAnalyzer (Contextual understanding)
+│   ├── Negation detection ("no diabetes")
+│   ├── Temporal context (past vs. current)
+│   ├── Severity assessment
+│   └── Certainty evaluation (definite vs. suspected)
+└── Adapters/ (Pluggable extractors)
+    ├── ICD10Adapter (ICD-10 code extraction)
+    │   ├── Pattern matching
+    │   ├── NLP-based extraction
+    │   ├── Specificity validation
+    │   └── Conflict detection
+    └── CPTAdapter (CPT code extraction)
+        ├── Procedure identification
+        ├── Category classification
+        ├── Billability determination
+        └── Revenue impact calculation
+```
+
+### Extraction Flow
+
+```typescript
+Input: Raw medical note text (from PDF)
+    ↓
+┌─────────────────────────────────────┐
+│ DocumentPreprocessor                │
+│ - Remove noise and artifacts        │
+│ - Normalize text formatting         │
+│ - Clean special characters          │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ SectionDetector                     │
+│ - Identify note sections            │
+│   • Chief Complaint                 │
+│   • History of Present Illness      │
+│   • Review of Systems               │
+│   • Assessment & Plan               │
+│ - Map section boundaries            │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ EntityExtractor                     │
+│ - Extract medical entities          │
+│   • Diagnoses                       │
+│   • Procedures                      │
+│   • Medications                     │
+│   • Lab results                     │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ ContextAnalyzer                     │
+│ - Analyze context around entities   │
+│   • Negation ("no fever")           │
+│   • Temporality (past vs current)   │
+│   • Certainty (definite vs rule out)│
+│   • Severity (mild vs severe)       │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ Code Extraction Adapters            │
+│                                     │
+│ ICD10Adapter                        │
+│ - Extract ICD-10 codes from text    │
+│ - Validate code specificity         │
+│ - Detect conflicts with documented  │
+│ - Check parent/child relationships  │
+│                                     │
+│ CPTAdapter                          │
+│ - Identify billable procedures      │
+│ - Categorize (E/M, labs, imaging)   │
+│ - Calculate revenue impact          │
+│ - Validate medical necessity        │
+└─────────────────────────────────────┘
+    ↓
+Output: Structured extraction results
+    ├── ICD-10 codes with confidence
+    ├── CPT codes with categories
+    ├── Context metadata
+    └── Validation results
+```
+
+### Adapter Pattern
+
+Each code type (ICD-10, CPT) has its own adapter that implements a common interface:
+
+```typescript
+interface CodeExtractionAdapter<T> {
+  extract(text: string, context: ExtractionContext): Promise<T[]>;
+  validate(codes: T[]): ValidationResult;
+  enrich(codes: T[], metadata: DocumentMetadata): T[];
+}
+
+// ICD-10 Adapter Implementation
+class ICD10Adapter implements CodeExtractionAdapter<ICD10Code> {
+  async extract(text: string, context: ExtractionContext) {
+    // 1. Pattern-based extraction
+    const patternCodes = this.extractByPattern(text);
+    
+    // 2. NLP-based extraction
+    const nlpCodes = this.extractByNLP(text, context);
+    
+    // 3. Combine and deduplicate
+    const allCodes = this.deduplicate([...patternCodes, ...nlpCodes]);
+    
+    // 4. Validate specificity
+    return this.validateSpecificity(allCodes);
+  }
+  
+  validate(codes: ICD10Code[]) {
+    // Check for conflicts (less specific when more specific exists)
+    // Verify code exists in ICD-10-CM database
+    // Check MEAT criteria correlation
+  }
+}
+
+// CPT Adapter Implementation
+class CPTAdapter implements CodeExtractionAdapter<CPTCode> {
+  async extract(text: string, context: ExtractionContext) {
+    // 1. Identify procedures in text
+    const procedures = this.identifyProcedures(text);
+    
+    // 2. Map to CPT codes
+    const codes = this.mapToCPT(procedures);
+    
+    // 3. Classify by category
+    return this.classifyAndEnrich(codes);
+  }
+  
+  validate(codes: CPTCode[]) {
+    // Verify billability
+    // Check medical necessity
+    // Validate code combinations
+  }
+}
+```
+
+### Integration with Analysis Engine
+
+```typescript
+// Main analysis flow
+async function analyzeDocument(text: string) {
+  // 1. Initialize extraction engine
+  const engine = new ExtractionEngine();
+  
+  // 2. Run extraction pipeline
+  const extractionResult = await engine.extract(text);
+  
+  // 3. Run traditional analysis
+  const analysisResult = analyzeDocumentation(text);
+  
+  // 4. Enhance with extracted codes
+  analysisResult.icd10Codes = extractionResult.icd10Codes;
+  analysisResult.cptCodes = extractionResult.cptCodes;
+  
+  // 5. Calculate revenue impact
+  analysisResult.revenueImpact = calculateRevenueImpact(
+    extractionResult.cptCodes,
+    extractionResult.icd10Codes
+  );
+  
+  return analysisResult;
+}
+```
+
+### Key Benefits
+
+1. **Modularity**: Easy to add new code types (HCPCS, dental codes, etc.)
+2. **Testability**: Each component can be tested independently
+3. **Maintainability**: Clear separation of concerns
+4. **Extensibility**: Plugin architecture for custom extractors
+5. **Accuracy**: Context-aware extraction reduces false positives
+6. **Performance**: Streaming processing for large documents
+
+### Dependencies
+
+```typescript
+// Core extraction dependencies
+import compromise from 'compromise';  // NLP processing
+import Fuse from 'fuse.js';          // Fuzzy matching
+import { ICD10CM } from '@lowlysre/icd-10-cm';  // ICD-10 database
+
+// Internal dependencies
+import { CPTDatabase } from './cpt-database';
+import { RevenueCalculator } from './revenue-calculator';
 ```
 
 ---
