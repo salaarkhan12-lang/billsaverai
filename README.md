@@ -28,6 +28,8 @@ npm run dev
 
 📖 **New to BillSaver?** Start with the [Quick Start Guide](QUICKSTART.md)
 
+**DEPLOYMENT*** billsaverai.vercel.app/dashboard
+
 ---
 
 ## ✨ Features
