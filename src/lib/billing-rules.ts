@@ -1,9 +1,12 @@
 // Comprehensive Medical Billing Documentation Rules Engine
 // Based on 2024-2025 E/M Coding Guidelines, HCC Requirements, and MEAT Criteria
 // Enhanced with TensorFlow.js ML models for Phase 1
+// Revenue calculations powered by commercial CPT pricing system
 
 import { qualityPredictor, gapDetector, cptPredictor, initializeMLModels } from './ml-models';
 import type { QualityPrediction, GapPrediction, CPTCodePrediction } from './ml-models';
+import { calculateRevenue, toLegacyRevenueString, calculateTotalRevenue } from './revenue-calculator';
+import type { RevenueCalculation } from './types/revenue';
 
 export interface GapLocation {
   page: number;
@@ -21,7 +24,8 @@ export interface DocumentationGap {
   description: string;
   impact: string;
   recommendation: string;
-  potentialRevenueLoss: string;
+  potentialRevenueLoss: string;  // LEGACY: Kept for backward compatibility
+  revenueImpact?: RevenueCalculation;  // NEW: Detailed revenue breakdown
   cptCodes?: string[];
   icdCodes?: string[];
   mlConfidence?: number; // ML confidence score for this gap
@@ -41,6 +45,7 @@ export interface AnalysisResult {
   mdmComplexity: 'Straightforward' | 'Low' | 'Moderate' | 'High';
   timeDocumented: boolean;
   meatCriteriaMet: boolean;
+  documentText?: string; // NEW: Store document text for ICD extraction
   // ML-enhanced fields
   mlQualityScore?: number;
   mlConfidence?: number;
@@ -367,7 +372,19 @@ function findGapLocation(text: string, matchIndex: number, parseResult: PDFParse
 
 import { DataMoatService } from './data-moat';
 
-export async function analyzeDocument(parseResult: PDFParseResult): Promise<AnalysisResult> {
+// Analysis options (for payer selection)
+export interface AnalysisOptions {
+  payerId?: string;  // Payer ID (default: 'bcbs-national')
+  visitsPerYear?: number;  // Estimated visits/year (default: 52)
+}
+
+export async function analyzeDocument(
+  parseResult: PDFParseResult,
+  options?: AnalysisOptions
+): Promise<AnalysisResult> {
+  // Extract options with defaults
+  const payerId = options?.payerId || 'bcbs-national';
+  const visitsPerYear = options?.visitsPerYear || 52;
   // THE DATA MOAT: Sanitize text before ANY processing
   const rawText = parseResult.text;
   const sanitizationResult = DataMoatService.sanitizeClinicalText(rawText);
@@ -445,7 +462,7 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
       description: 'No clear chief complaint or reason for visit was identified in the documentation.',
       impact: 'Claims may be denied without a documented reason for the encounter.',
       recommendation: 'Add a clear chief complaint statement at the beginning of the note (e.g., "CC: Follow-up for diabetes management" or "Patient presents with...").',
-      potentialRevenueLoss: '$50-200 per visit',
+      potentialRevenueLoss: '$50-$200/visit (potential claim denial)',
       location: findGapLocation(text, 0, parseResult), // Default to beginning if not found
     });
   } else {
@@ -472,6 +489,15 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
       .filter(check => !foundHpiElements.includes(DOCUMENTATION_CHECKS[check].element))
       .map(check => DOCUMENTATION_CHECKS[check].element.replace('HPI - ', ''));
 
+    // Calculate revenue impact: 99213 -> 99214 upgrade potential
+    const revenueCalc = calculateRevenue({
+      currentCPT: '99213',
+      potentialCPT: '99214',
+      payerId,
+      visitsPerYear,
+      confidence: found.hpiElements >= 2 ? 0.80 : 0.65,
+    });
+
     gaps.push({
       id: 'hpi-incomplete',
       category: found.hpiElements < 2 ? 'critical' : 'major',
@@ -479,7 +505,8 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
       description: `Only ${found.hpiElements} HPI elements documented. Missing: ${missingHpi.slice(0, 4).join(', ')}${missingHpi.length > 4 ? '...' : ''}.`,
       impact: 'Insufficient HPI documentation may result in downcoding from Level 4/5 to Level 2/3.',
       recommendation: 'Document at least 4 HPI elements for extended HPI. Consider adding: location, quality, severity, duration, timing, context, modifying factors, and associated symptoms.',
-      potentialRevenueLoss: '$40-80 per visit (difference between E/M levels)',
+      potentialRevenueLoss: toLegacyRevenueString(revenueCalc),
+      revenueImpact: revenueCalc,
     });
   } else {
     strengths.push(`Extended HPI documented (${found.hpiElements} elements)`);
@@ -622,6 +649,10 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
 
   // If HCC conditions found, check MEAT compliance
   if (found.hccConditions.length > 0 && found.meatCriteria === 0) {
+    // HCC revenue loss calculation (annualized, not per-visit)
+    // Each HCC condition worth $500-2000 in RAF score annually
+    const estimatedHCCLoss = found.hccConditions.length * 1000; // Conservative $1000/HCC
+
     gaps.push({
       id: 'meat-missing',
       category: 'critical',
@@ -629,7 +660,8 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
       description: `HCC conditions identified (${found.hccConditions.join(', ')}) but no MEAT documentation found.`,
       impact: 'HCC diagnoses require MEAT documentation for risk adjustment. Missing MEAT = no RAF score credit.',
       recommendation: 'For each chronic condition, document that it was Monitored, Evaluated, Assessed/Addressed, or Treated. Example: "Diabetes - A1c reviewed (Evaluated), continue metformin (Treated), discussed diet (Addressed)".',
-      potentialRevenueLoss: '$500-2000+ annually per HCC condition',
+      potentialRevenueLoss: `$${estimatedHCCLoss.toLocaleString()}+ annually (${found.hccConditions.length} HCC conditions)`,
+      // Note: No revenueImpact for HCC gaps - different calculation model (annual RAF vs per-visit CPT)
     });
   } else if (found.hccConditions.length > 0) {
     strengths.push(`MEAT criteria documented for HCC conditions (${foundMeat.join(', ')})`);
@@ -644,6 +676,15 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
   }
 
   if (!found.timeDocumented) {
+    // Calculate revenue impact: Potential 99213 -> 99214 if time justifies
+    const revenueCalc = calculateRevenue({
+      currentCPT: '99213',
+      potentialCPT: '99214',
+      payerId,
+      visitsPerYear,
+      confidence: 0.50,  // Lower confidence - time may or may not support upgrade
+    });
+
     gaps.push({
       id: 'time-missing',
       category: 'moderate',
@@ -651,7 +692,8 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
       description: 'No documentation of time spent on the encounter.',
       impact: 'Time-based billing option unavailable. May miss opportunity for higher E/M level if time exceeds MDM requirements.',
       recommendation: 'Document total time spent on the encounter, including: reviewing records, examining patient, counseling, care coordination, and documentation. Example: "Total time: 35 minutes".',
-      potentialRevenueLoss: '$20-60 if time supports higher level',
+      potentialRevenueLoss: toLegacyRevenueString(revenueCalc),
+      revenueImpact: revenueCalc,
     });
   } else {
     strengths.push('Time documentation present');
@@ -685,7 +727,7 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
       description: 'Diagnoses may lack required specificity (type, laterality, stage, controlled/uncontrolled status).',
       impact: 'Unspecified diagnosis codes result in lower reimbursement and failed HCC capture.',
       recommendation: 'Specify: Type 1 vs Type 2, controlled vs uncontrolled, with/without complications, laterality (left/right/bilateral), acute vs chronic, stage/grade where applicable.',
-      potentialRevenueLoss: '$100-500+ per unspecified HCC',
+      potentialRevenueLoss: '$100-$500+/HCC annually',
       icdCodes: ['Use specific codes, avoid .9 unspecified codes'],
     });
   } else if (found.diagnosisSpecificity) {
@@ -731,7 +773,7 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
         description: `ML analysis detected potential issue: ${mlGap.gapType}`,
         impact: 'ML-enhanced gap detection for improved documentation quality',
         recommendation: mlGap.suggestedFix,
-        potentialRevenueLoss: '$50-200 per visit',
+        potentialRevenueLoss: '$50-$200/visit (estimated)',
         mlConfidence: mlGap.probability,
         isMLDetected: true,
       });
@@ -827,13 +869,32 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
   else documentationLevel = 'Critical';
 
   // Calculate potential revenue loss
-  const criticalGaps = gaps.filter(g => g.category === 'critical').length;
-  const majorGaps = gaps.filter(g => g.category === 'major').length;
-  let totalLoss = criticalGaps * 150 + majorGaps * 60 + (gaps.length - criticalGaps - majorGaps) * 25;
+  // NEW: Use precise CPT-based calculations from revenueImpact
+  const gapsWithRevenue = gaps.filter(g => g.revenueImpact);
 
-  if (found.hccConditions.length > 0 && found.meatCriteria === 0) {
-    totalLoss += found.hccConditions.length * 800;
+  let totalPerVisitLoss = 0;
+  let totalAnnualLoss = 0;
+
+  if (gapsWithRevenue.length > 0) {
+    const revenueTotal = calculateTotalRevenue(gapsWithRevenue.map(g => g.revenueImpact!));
+    totalPerVisitLoss = revenueTotal.perVisit;
+    totalAnnualLoss = revenueTotal.annualized;
   }
+
+  // LEGACY: Fallback calculation for gaps without precise revenue data
+  const gapsWithoutRevenue = gaps.filter(g => !g.revenueImpact);
+  const criticalGaps = gapsWithoutRevenue.filter(g => g.category === 'critical').length;
+  const majorGaps = gapsWithoutRevenue.filter(g => g.category === 'major').length;
+  const legacyLoss = criticalGaps * 150 + majorGaps * 60 + (gapsWithoutRevenue.length - criticalGaps - majorGaps) * 25;
+
+  // Add HCC loss if applicable (not per-visit, so add to legacy)
+  if (found.hccConditions.length > 0 && found.meatCriteria === 0) {
+    const hccLoss = found.hccConditions.length * 1000;
+    totalAnnualLoss += hccLoss;
+  }
+
+  // Combine totals
+  const combinedTotal = totalAnnualLoss + legacyLoss;
 
   return {
     overallScore: score,
@@ -843,10 +904,11 @@ export async function analyzeDocument(parseResult: PDFParseResult): Promise<Anal
     suggestedEMLevel,
     currentEMLevel,
     potentialUpcodeOpportunity: suggestedEMLevel !== currentEMLevel,
-    totalPotentialRevenueLoss: `$${totalLoss.toLocaleString()}+`,
+    totalPotentialRevenueLoss: `$${Math.round(combinedTotal).toLocaleString()}+`,
     mdmComplexity,
     timeDocumented: found.timeDocumented,
     meatCriteriaMet: found.meatCriteria > 0,
+    documentText: text, // NEW: Include document text for ICD extraction
     // ML-enhanced fields
     mlQualityScore: mlQualityPrediction?.score,
     mlConfidence: mlQualityPrediction?.confidence,

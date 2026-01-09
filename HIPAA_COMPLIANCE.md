@@ -103,11 +103,20 @@ BillSaver implements comprehensive HIPAA compliance measures to protect Protecte
 ```typescript
 // AES-GCM 256-bit encryption with PBKDF2 key derivation
 const encryptedData = await encryptWithPassword(data, userPassword);
-// - PBKDF2 with 100,000 iterations
+// - PBKDF2 with 500,000 iterations (OWASP 2024 standard)
 // - AES-GCM authenticated encryption
-// - SHA-256 data integrity hashes
+// - SHA-256 data integrity hashes with tamper detection
+// - Memory-only key storage (no disk persistence)
 // - Unique IV and salt per encryption
+// - Automatic cleanup on page unload
 ```
+
+#### Data Storage Security
+- **Memory-Only Storage**: PHI stored exclusively in volatile memory, never persists to disk
+- **Tamper Detection**: SHA-256 checksums verify data integrity 
+- **Automatic Cleanup**: All data cleared on page unload or session timeout
+- **Session Management**: In-memory sessions with 30min idle, 8hr absolute timeout
+- **CSRF Protection**: CSRF tokens on all authenticated requests
 
 #### Database Encryption
 - **At-Rest**: AWS KMS encryption for PostgreSQL

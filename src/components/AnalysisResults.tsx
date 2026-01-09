@@ -6,6 +6,7 @@ import { AnimatedCounter } from "./AnimatedCounter";
 import { GapList } from "./GapList";
 import { ProviderApprovalPanel } from "./ProviderApprovalPanel";
 import { PDFViewer } from "./PDFViewer";
+import { RecommendedBillingCodes } from "./billing/RecommendedBillingCodes";
 import type { AnalysisResult, DocumentationGap as Gap } from "@/lib/billing-rules";
 import { cn } from "@/lib/cn";
 import { useEffect, useState } from "react";
@@ -70,19 +71,19 @@ function ScoreRing({ score, level }: { score: number; level: AnalysisResult["doc
   );
 }
 
-// Helper to parse revenue
+// Helper to parse revenue - extract annual amount (the larger number)
 function parseRevenueAmount(revenueString: string): number {
   const numbers = revenueString.match(/\d+/g);
   if (!numbers || numbers.length === 0) return 0;
   if (numbers.length >= 2) {
-    const min = parseInt(numbers[0]);
-    const max = parseInt(numbers[1]);
-    return Math.round((min + max) / 2);
+    // Extract both numbers and return the larger one (annual amount)
+    const values = numbers.map(n => parseInt(n.replace(/,/g, '')));
+    return Math.max(...values);
   }
-  return parseInt(numbers[0]);
+  return parseInt(numbers[0].replace(/,/g, ''));
 }
 
-type Tab = 'overview' | 'details' | 'approval';
+type Tab = 'overview' | 'details' | 'billing' | 'approval';
 
 export function AnalysisResults({ result, fileName, onReset, file }: AnalysisResultsProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -187,11 +188,22 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
                 </button>
               </div>
               <GapList
-                gaps={result.gaps.filter(g => g.category === 'critical').slice(0, 3)}
+                gaps={result.gaps.slice(0, 3)}
                 onGapSelect={handleGapSelect}
                 selectedGapId={selectedGapId}
                 onFixGap={handleFixGap}
                 fixedGaps={fixedGaps}
+              />
+            </div>
+
+            {/* Billing Codes Section */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
+              <RecommendedBillingCodes
+                analysisResult={result}
+                onGapClick={(gapId) => {
+                  setSelectedGapId(gapId);
+                  setActiveTab('details');
+                }}
               />
             </div>
           </div>
@@ -212,6 +224,18 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
                 fixedGaps={fixedGaps}
               />
             </div>
+          </div>
+        );
+      case 'billing':
+        return (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+            <RecommendedBillingCodes
+              analysisResult={result}
+              onGapClick={(gapId) => {
+                setSelectedGapId(gapId);
+                setActiveTab('details');
+              }}
+            />
           </div>
         );
       case 'approval':
@@ -245,19 +269,18 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
               </svg>
             </button>
             <h1 className="text-xl font-semibold text-white tracking-tight">{fileName}</h1>
-            <span className="px-2 py-0.5 rounded text-[10px] bg-white/10 border border-white/10 text-white/50 font-mono">
-              ID: {Math.random().toString(36).substr(2, 6).toUpperCase()}
-            </span>
           </div>
           <div className="flex gap-2 text-xs text-white/40 ml-10">
             <span>Analyzed just now</span>
             <span>•</span>
             <span>{result.gaps.length} issues identified</span>
+            <span>•</span>
+            <span>{result.overallScore}/100</span>
           </div>
         </div>
 
         <div className="flex items-center bg-white/5 rounded-full p-1 border border-white/10">
-          {(['overview', 'details', 'approval'] as const).map((tab) => (
+          {(['overview', 'details', 'billing', 'approval'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -279,37 +302,13 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
         </div>
       </div>
 
-      {/* Main Split Layout */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
-        {/* Left Panel: Analysis & Lists */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col h-full min-h-0 bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden backdrop-blur-xl">
-          <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+      {/* Main Content - Full Width */}
+      <div className="flex-1 flex flex-col h-full min-h-0">
+        {/* Analysis Panel - Centered and Constrained */}
+        <div className="max-w-5xl mx-auto w-full flex flex-col h-full min-h-0 bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden backdrop-blur-xl">
+          <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
             {currentTabContent()}
           </div>
-        </div>
-
-        {/* Right Panel: PDF Viewer */}
-        <div className="hidden lg:block lg:col-span-8 bg-black/40 border border-white/10 rounded-2xl overflow-hidden relative backdrop-blur-sm">
-          {file ? (
-            <PDFViewer
-              file={file}
-              highlightedGap={selectedGap && selectedGap.location ? {
-                page: selectedGap.location.page,
-                position: selectedGap.location.position,
-                textSnippet: selectedGap.location.textSnippet
-              } : null}
-              allGaps={result.gaps.map(g => ({
-                id: g.id,
-                category: g.category,
-                location: g.location
-              }))}
-              variant="embedded"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-white/20">
-              <p>Document Preview Unavailable</p>
-            </div>
-          )}
         </div>
       </div>
     </div>

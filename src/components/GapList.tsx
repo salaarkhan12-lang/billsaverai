@@ -108,7 +108,7 @@ function GapItem({
                         </h4>
                         {gap.potentialRevenueLoss && (
                             <span className="text-red-400 font-mono text-xs font-semibold bg-red-500/10 px-2 py-0.5 rounded">
-                                -{gap.potentialRevenueLoss}
+                                {gap.potentialRevenueLoss}
                             </span>
                         )}
                     </div>

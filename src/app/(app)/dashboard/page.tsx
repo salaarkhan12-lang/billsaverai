@@ -10,6 +10,7 @@ import { ParticleField } from "@/components/ParticleField";
 import { EnhancedProgress } from "@/components/EnhancedProgress";
 import { Dashboard } from "@/components/Dashboard";
 import { InvestorPresentationMode } from "@/components/InvestorPresentationMode";
+import { PayerSelector } from "@/components/dashboard/payer-selector";  // NEW
 import { parsePDF } from "@/lib/blackbox_pdf-parser";
 import { analyzeDocument, type AnalysisResult } from "@/lib/billing-rules";
 import { createBatchProcessor, type BatchItem } from "@/lib/batch-processor";
@@ -41,6 +42,9 @@ export default function Home() {
   // Batch processing state
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [batchProcessor, setBatchProcessor] = useState<ReturnType<typeof createBatchProcessor> | null>(null);
+
+  // Payer selection for revenue calculations (NEW)
+  const [selectedPayer, setSelectedPayer] = useState('bcbs-national');
 
   // Animated gradient background positions
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -124,7 +128,10 @@ export default function Home() {
       // Analyze document
       console.log("Starting analysis...");
       setStatusMessage("Analyzing medical document with AI...");
-      const analysisResult = await analyzeDocument(parseResult);
+      const analysisResult = await analyzeDocument(parseResult, {
+        payerId: selectedPayer,  // Pass selected payer
+        visitsPerYear: 52,
+      });
       console.log("Analysis complete:", analysisResult);
       setStatusMessage("AI analysis complete!");
 
@@ -174,9 +181,16 @@ export default function Home() {
   }, []);
 
   const handleDemoMode = useCallback(() => {
-    setFileName("Demo_Medical_Note.pdf");
-    setResult(DEMO_ANALYSIS_RESULT);
-    setAppState("results");
+    // Import and get a random demo medical note
+    import('@/lib/demo-medical-notes').then(({ getRandomDemoNote }) => {
+      const { file, filename, title } = getRandomDemoNote();
+
+      console.log(`📋 Demo Mode: Loading ${title}`);
+      setFileName(filename);
+      setCurrentFile(file);
+      setResult(DEMO_ANALYSIS_RESULT);
+      setAppState("results");
+    });
   }, []);
 
   // Batch processing handlers
@@ -260,8 +274,8 @@ export default function Home() {
             <button
               onClick={() => setProcessingMode("single")}
               className={`px-4 py-2 rounded-lg font-medium transition-all ${processingMode === "single"
-                  ? "bg-blue-500/20 text-blue-400 shadow-lg"
-                  : "text-white/60 hover:text-white hover:bg-white/10"
+                ? "bg-blue-500/20 text-blue-400 shadow-lg"
+                : "text-white/60 hover:text-white hover:bg-white/10"
                 }`}
             >
               Single File
@@ -269,8 +283,8 @@ export default function Home() {
             <button
               onClick={() => setProcessingMode("batch")}
               className={`px-4 py-2 rounded-lg font-medium transition-all ${processingMode === "batch"
-                  ? "bg-purple-500/20 text-purple-400 shadow-lg"
-                  : "text-white/60 hover:text-white hover:bg-white/10"
+                ? "bg-purple-500/20 text-purple-400 shadow-lg"
+                : "text-white/60 hover:text-white hover:bg-white/10"
                 }`}
             >
               Batch Processing
@@ -405,6 +419,20 @@ export default function Home() {
                   </motion.div>
                 )}
               </div>
+
+              {/* Payer Selector - NEW */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mb-6"
+              >
+                <PayerSelector
+                  selectedPayer={selectedPayer}
+                  onPayerChange={setSelectedPayer}
+                />
+              </motion.div>
+
               <UploadZone onFileSelect={handleFileSelect} />
 
               {/* Demo Mode Button */}
@@ -599,8 +627,8 @@ export default function Home() {
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${item.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                              item.status === 'error' ? 'bg-red-500/20 text-red-400' :
-                                'bg-blue-500/20 text-blue-400'
+                            item.status === 'error' ? 'bg-red-500/20 text-red-400' :
+                              'bg-blue-500/20 text-blue-400'
                             }`}>
                             {item.status === 'completed' ? '✓' :
                               item.status === 'error' ? '✗' :
@@ -611,8 +639,8 @@ export default function Home() {
                           </span>
                         </div>
                         <span className={`text-xs ${item.status === 'completed' ? 'text-green-400' :
-                            item.status === 'error' ? 'text-red-400' :
-                              'text-blue-400'
+                          item.status === 'error' ? 'text-red-400' :
+                            'text-blue-400'
                           }`}>
                           {item.status === 'completed' ? 'Complete' :
                             item.status === 'error' ? 'Failed' :

@@ -55,6 +55,11 @@ export const DEMO_ANALYSIS_RESULT = {
       potentialRevenueLoss: "$200-300",
       cptCodes: ["99214", "99215"],
       icdCodes: ["E11.65", "I10"],
+      location: {
+        page: 1,
+        position: 0,
+        textSnippet: "ASSESSMENT"
+      }
     },
     {
       id: "demo-gap-2",
@@ -66,6 +71,11 @@ export const DEMO_ANALYSIS_RESULT = {
       potentialRevenueLoss: "$150-250",
       cptCodes: ["99214"],
       icdCodes: ["E11.65", "E11.9", "I10"],
+      location: {
+        page: 1,
+        position: 1,
+        textSnippet: "Type 2 Diabetes Mellitus"
+      }
     },
     {
       id: "demo-gap-3",
@@ -77,6 +87,11 @@ export const DEMO_ANALYSIS_RESULT = {
       potentialRevenueLoss: "$50-100",
       cptCodes: ["99214", "99215"],
       icdCodes: [],
+      location: {
+        page: 1,
+        position: 2,
+        textSnippet: "REVIEW OF SYSTEMS"
+      }
     },
     {
       id: "demo-gap-4",
@@ -88,6 +103,11 @@ export const DEMO_ANALYSIS_RESULT = {
       potentialRevenueLoss: "$50-100",
       cptCodes: ["99215"],
       icdCodes: [],
+      location: {
+        page: 1,
+        position: 3,
+        textSnippet: "Total time: 25 minutes"
+      }
     },
   ],
   strengths: [

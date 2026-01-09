@@ -12,6 +12,7 @@ import {
   computeHash,
 } from './encryption';
 import type { AnalysisResult } from './billing-rules';
+import { memoryStore } from './security/memory-store';
 
 export interface UserEncryptionKeys {
   passwordDerived: boolean; // Whether keys are derived from password
@@ -128,30 +129,29 @@ export class EncryptionService {
   }
 
   /**
-   * Stores encryption keys securely (uses sessionStorage for demo to ensure ephemeral storage)
+   * SECURITY FIX: Stores encryption keys in memory only (NO browser storage)
+   * Keys are automatically cleared on page unload
    */
   private static async storeEncryptionKeys(id: string, keyInfo: UserEncryptionKeys): Promise<void> {
-    if (typeof window === 'undefined') return;
-
     try {
-      const key = `${this.STORAGE_KEY_PREFIX}${id}`;
-      sessionStorage.setItem(key, JSON.stringify(keyInfo));
+      await memoryStore.set(`${this.STORAGE_KEY_PREFIX}${id}`, keyInfo, {
+        enableTamperDetection: true,
+      });
     } catch (error) {
-      console.error('Failed to store encryption keys:', error);
-      throw new EncryptionError('Failed to store encryption keys');
+      throw new EncryptionError('Failed to store encryption keys in memory', error as Error);
     }
   }
 
   /**
-   * Retrieves encryption keys
+   * Retrieves encryption keys from memory
    */
   private static async retrieveEncryptionKeys(id: string): Promise<UserEncryptionKeys | null> {
-    if (typeof window === 'undefined') return null;
-
     try {
-      const key = `${this.STORAGE_KEY_PREFIX}${id}`;
-      const stored = sessionStorage.getItem(key);
-      return stored ? JSON.parse(stored) : null;
+      const keyInfo = await memoryStore.get<UserEncryptionKeys>(
+        `${this.STORAGE_KEY_PREFIX}${id}`,
+        { enableTamperDetection: true }
+      );
+      return keyInfo;
     } catch (error) {
       console.error('Failed to retrieve encryption keys:', error);
       return null;
@@ -159,48 +159,48 @@ export class EncryptionService {
   }
 
   /**
-   * Stores encrypted data locally (for offline access)
-   * SECURITY UPDATE: Uses sessionStorage to ensure data is cleared on session end
+   * Stores encrypted data in memory (for offline access)
+   * SECURITY FIX: Uses memory-only storage to ensure data is cleared on session end
    */
   static async storeEncryptedDataLocally(encryptedData: EncryptedAnalysisData): Promise<void> {
-    if (typeof window === 'undefined') return;
-
     try {
-      const key = `${this.ENCRYPTED_DATA_PREFIX}${encryptedData.id}`;
-      sessionStorage.setItem(key, JSON.stringify(encryptedData));
+      await memoryStore.set(
+        `${this.ENCRYPTED_DATA_PREFIX}${encryptedData.id}`,
+        encryptedData,
+        { enableTamperDetection: true }
+      );
     } catch (error) {
-      console.error('Failed to store encrypted data locally:', error);
-      throw new EncryptionError('Failed to store encrypted data locally');
+      throw new EncryptionError('Failed to store encrypted data in memory', error as Error);
     }
   }
 
   /**
-   * Retrieves encrypted data from local storage
+   * Retrieves encrypted data from memory
    */
   static async retrieveEncryptedDataLocally(id: string): Promise<EncryptedAnalysisData | null> {
-    if (typeof window === 'undefined') return null;
-
     try {
-      const key = `${this.ENCRYPTED_DATA_PREFIX}${id}`;
-      const stored = sessionStorage.getItem(key);
-      return stored ? JSON.parse(stored) : null;
+      const data = await memoryStore.get<EncryptedAnalysisData>(
+        `${this.ENCRYPTED_DATA_PREFIX}${id}`,
+        { enableTamperDetection: true }
+      );
+      return data;
     } catch (error) {
-      console.error('Failed to retrieve encrypted data locally:', error);
+      console.error('Failed to retrieve encrypted data:', error);
       return null;
     }
   }
 
   /**
-   * Lists all encrypted data IDs for a user
+   * Lists all encrypted data IDs in memory
    */
   static async listEncryptedDataIds(): Promise<string[]> {
-    if (typeof window === 'undefined') return [];
-
     try {
-      const keys = Object.keys(sessionStorage).filter(key =>
-        key.startsWith(this.ENCRYPTED_DATA_PREFIX)
-      );
-      return keys.map(key => key.replace(this.ENCRYPTED_DATA_PREFIX, ''));
+      const allKeys = memoryStore.keys();
+      const dataIds = allKeys
+        .filter(key => key.startsWith(this.ENCRYPTED_DATA_PREFIX))
+        .map(key => key.replace(this.ENCRYPTED_DATA_PREFIX, ''));
+
+      return dataIds;
     } catch (error) {
       console.error('Failed to list encrypted data IDs:', error);
       return [];
@@ -208,17 +208,14 @@ export class EncryptionService {
   }
 
   /**
-   * Removes encrypted data and keys from local storage
+   * Removes encrypted data and keys from memory
    */
   static async removeEncryptedData(id: string): Promise<void> {
-    if (typeof window === 'undefined') return;
-
     try {
-      sessionStorage.removeItem(`${this.ENCRYPTED_DATA_PREFIX}${id}`);
-      sessionStorage.removeItem(`${this.STORAGE_KEY_PREFIX}${id}`);
+      memoryStore.delete(`${this.ENCRYPTED_DATA_PREFIX}${id}`);
+      memoryStore.delete(`${this.STORAGE_KEY_PREFIX}${id}`);
     } catch (error) {
-      console.error('Failed to remove encrypted data:', error);
-      throw new EncryptionError('Failed to remove encrypted data');
+      throw new EncryptionError('Failed to remove encrypted data from memory', error as Error);
     }
   }
 

@@ -1,0 +1,61 @@
+PATIENT NAME: Johnson, Robert M.
+DATE OF SERVICE: 01/15/2024
+PROVIDER: Dr. Sarah Chen, MD
+VISIT TYPE: Office Visit - Follow-up
+
+CHIEF COMPLAINT:
+Patient presents for diabetes management.
+
+HISTORY OF PRESENT ILLNESS:
+68 y/o male with history of Type 2 Diabetes Mellitus. Patient reports blood sugars have been running high lately, ranging from 180-220 mg/dL. He has been compliant with medications. No symptoms of hypoglycemia. Denies polyuria or polydipsia.
+
+PAST MEDICAL HISTORY:
+- Type 2 Diabetes Mellitus (since 2015)
+- Hypertension
+- Hyperlipidemia
+- Benign Prostatic Hyperplasia
+
+MEDICATIONS:
+- Metformin 1000mg BID
+- Lisinopril 20mg daily
+- Atorvastatin 40mg daily
+- Tamsulosin 0.4mg daily
+
+ALLERGIES: NKDA
+
+SOCIAL HISTORY:
+Non-smoker. Occasional alcohol use (1-2 drinks per week). Lives with spouse. Retired teacher.
+
+FAMILY HISTORY:
+Father - Type 2 DM, CAD. Mother - HTN, stroke at age 75.
+
+REVIEW OF SYSTEMS:
+General: Denies fever, chills, weight changes
+Cardiovascular: Denies chest pain, palpitations
+Respiratory: Denies SOB, cough
+Endocrine: As per HPI
+
+PHYSICAL EXAMINATION:
+Vital Signs: BP 142/88, HR 78, RR 16, Temp 98.6°F, Weight 195 lbs
+General: Alert and oriented x3, no acute distress
+HEENT: Normocephalic, atraumatic
+Neck: No JVD, no thyromegaly
+Cardiovascular: RRR, no murmurs
+Lungs: CTA bilaterally
+Abdomen: Soft, non-tender
+Extremities: No edema, pedal pulses intact
+
+ASSESSMENT:
+1. Type 2 Diabetes Mellitus - uncontrolled (HbA1c elevated at last check)
+2. Hypertension - controlled
+3. Hyperlipidemia - on statin therapy
+
+PLAN:
+- Increase Metformin to 1000mg TID
+- Continue current BP and lipid medications
+- Order HbA1c, lipid panel, CMP
+- Diabetic retinopathy screening recommended
+- Follow up in 3 months
+- Patient education provided regarding diet and exercise
+
+Total time: 25 minutes

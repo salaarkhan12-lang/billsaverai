@@ -1,0 +1,45 @@
+PATIENT NAME: Williams, Jennifer L.
+DATE OF SERVICE: 01/18/2024  
+PROVIDER: Dr. Michael Park, MD
+VISIT TYPE: New Patient Consultation
+
+CHIEF COMPLAINT:
+Chronic back pain
+
+HISTORY OF PRESENT ILLNESS:
+45 y/o female presents with lower back pain for past 6 months. Pain is described as dull, aching, worse with prolonged sitting. Radiates down left leg occasionally. Has tried OTC ibuprofen with minimal relief. No history of trauma. Pain affects daily activities and sleep.
+
+PAST MEDICAL HISTORY:
+- Hypothyroidism
+- Anxiety disorder
+
+MEDICATIONS:
+- Levothyroxine 100mcg daily
+- Sertraline 50mg daily
+
+ALLERGIES: Penicillin (rash)
+
+REVIEW OF SYSTEMS:
+Musculoskeletal: As per HPI
+Neurological: Denies numbness, weakness
+All other systems reviewed and negative
+
+PHYSICAL EXAMINATION:
+Vital Signs: BP 128/82, HR 72, RR 14
+General: Well-appearing female in no distress
+Back: Tenderness over L4-L5 region, limited ROM with forward flexion
+Neurological: Motor 5/5 all extremities, sensation intact, negative straight leg raise
+
+ASSESSMENT:
+1. Chronic low back pain, likely musculoskeletal
+2. Hypothyroidism - stable
+3. Anxiety disorder - controlled
+
+PLAN:
+- Start physical therapy referral
+- Prescribe cyclobenzaprine 10mg at bedtime PRN
+- X-ray lumbar spine
+- Follow up in 4 weeks
+- Discussed proper body mechanics
+
+Time spent: 20 minutes, more than half counseling and coordination of care.

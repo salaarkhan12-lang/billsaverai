@@ -39,11 +39,12 @@ export function generateIV(): Uint8Array {
 
 /**
  * Derives a cryptographic key from a password using PBKDF2
+ * SECURITY: Updated to 500,000 iterations (OWASP 2024 recommendation)
  */
 export async function deriveKeyFromPassword(
   password: string,
   salt: Uint8Array,
-  iterations: number = 100000
+  iterations: number = 500000 // Increased from 100,000
 ): Promise<CryptoKey> {
   try {
     // Convert password to key material

@@ -1,0 +1,21 @@
+PATIENT NAME: Martinez, Carlos
+DATE OF SERVICE: 01/20/2024
+PROVIDER: Dr. Lisa Thompson, MD  
+VISIT TYPE: Office Visit
+
+Patient here today.
+
+Blood pressure high. Discussed medications.
+
+EXAMINATION:
+BP 156/94
+Heart: Normal
+Lungs: Clear
+
+ASSESSMENT:
+Hypertension
+
+PLAN:
+Increase lisinopril
+Recheck BP in 2 weeks
+Labs ordered
