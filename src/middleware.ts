@@ -107,7 +107,8 @@ function buildSecurityHeaders(nonce: string): Record<string, string> {
             : {}),
 
         // Cross-Origin policies
-        'Cross-Origin-Embedder-Policy': 'require-corp',
+        // Note: COEP removed to allow Tesseract.js to load training data from CDN
+        // 'Cross-Origin-Embedder-Policy': 'require-corp', // Blocks Tesseract.js CDN
         'Cross-Origin-Opener-Policy': 'same-origin',
         'Cross-Origin-Resource-Policy': 'same-origin',
 
