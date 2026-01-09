@@ -36,9 +36,9 @@ async function extractTextWithOCR(file: File, pageCount: number, onProgress?: (p
     // Convert PDF pages to images and run OCR
     const pdfjsLib = await import("pdfjs-dist");
 
-    // Ensure worker is configured - use public path directly
+    // Ensure worker is configured - use CDN for reliability in production
     if (typeof window !== 'undefined') {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -178,10 +178,10 @@ export async function parsePDF(file: File, onProgress?: (progress: number) => vo
     // Dynamically import pdfjs-dist only on client side
     const pdfjsLib = await import("pdfjs-dist");
 
-    // Configure PDF.js worker - use public path directly
+    // Configure PDF.js worker - use CDN for reliability in production
     if (typeof window !== 'undefined') {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-      console.log("✓ PDF.js worker configured to use /pdf.worker.min.mjs");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs';
+      console.log("✓ PDF.js worker configured to use CDN");
     }
 
     const arrayBuffer = await file.arrayBuffer();
