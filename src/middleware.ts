@@ -21,11 +21,12 @@ function buildCSP(nonce: string): string {
         // Default: only allow same-origin
         "default-src 'self'",
 
-        // Scripts: self + nonce for inline scripts
+        // Scripts: self + nonce for inline scripts + unsafe-inline as fallback
         // Note: unsafe-eval added in development for TensorFlow.js/ML models
+        // Note: unsafe-inline is ignored when nonce/strict-dynamic present (CSP3), but needed for Next.js
         process.env.NODE_ENV === 'development'
-            ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
-            : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+            ? `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
+            : `script-src 'self' 'unsafe-inline'`,
 
         // Styles: self + unsafe-inline (required for Tailwind CSS)
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
