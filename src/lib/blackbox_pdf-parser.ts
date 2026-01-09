@@ -48,20 +48,28 @@ async function extractTextWithOCR(file: File, pageCount: number, onProgress?: (p
       isEvalSupported: false,
     }).promise;
 
-    // Create Tesseract worker with detailed logging
+    // Create Tesseract worker with detailed logging and explicit CDN paths
     console.log("📝 Initializing Tesseract OCR worker...");
-    worker = await createWorker('eng', 1, {
-      logger: (m) => {
-        const progress = m.progress ? Math.round(m.progress * 100) : 0;
-        console.log(`   OCR Worker: ${m.status} ${m.progress ? `(${progress}%)` : ''}`);
-        if (m.status === 'recognizing text' && onProgress) {
-          onProgress(progress);
+    try {
+      worker = await createWorker('eng', 1, {
+        workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+        langPath: 'https://cdn.jsdelivr.net/npm/tessdata@4.0.0',
+        corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core.wasm.js',
+        logger: (m) => {
+          const progress = m.progress ? Math.round(m.progress * 100) : 0;
+          console.log(`   OCR Worker: ${m.status} ${m.progress ? `(${progress}%)` : ''}`);
+          if (m.status === 'recognizing text' && onProgress) {
+            onProgress(progress);
+          }
+        },
+        errorHandler: (err) => {
+          console.error("   OCR Worker Error:", err);
         }
-      },
-      errorHandler: (err) => {
-        console.error("   OCR Worker Error:", err);
-      }
-    });
+      });
+    } catch (workerError) {
+      console.error("   ❌ Failed to create Tesseract worker:", workerError);
+      throw new Error(`Failed to initialize OCR: ${workerError instanceof Error ? workerError.message : 'Could not load Tesseract worker'}`);
+    }
 
     console.log("✓ OCR worker initialized successfully");
 
