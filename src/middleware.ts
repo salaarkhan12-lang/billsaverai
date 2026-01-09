@@ -21,13 +21,14 @@ function buildCSP(nonce: string): string {
         // Default: only allow same-origin
         "default-src 'self'",
 
-        // Scripts: self + unsafe-inline + CDN for PDF.js/Tesseract workers
+        // Scripts: self + unsafe-inline + CDN for PDF.js/Tesseract workers + WASM support
         // Note: unsafe-eval added in development for TensorFlow.js/ML models
-        // Note: unsafe-inline is ignored when nonce/strict-dynamic present (CSP3), but needed for Next.js
+        // Note: unsafe-inline needed for Next.js framework scripts
         // Note: cdn.jsdelivr.net needed for PDF.js and Tesseract.js workers
+        // Note: wasm-unsafe-eval needed for Tesseract.js WebAssembly compilation
         process.env.NODE_ENV === 'development'
-            ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net`
-            : `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net`,
+            ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net`
+            : `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net`,
 
         // Styles: self + unsafe-inline (required for Tailwind CSS)
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -38,11 +39,12 @@ function buildCSP(nonce: string): string {
         // Fonts: self + Google Fonts
         "font-src 'self' https://fonts.gstatic.com",
 
-        // Connect: API calls + CDN for Tesseract.js OCR training data
+        // Connect: API calls + CDN for Tesseract.js + data URIs for WASM
         // Note: localhost:3001 only in development
+        // Note: data: needed for Tesseract WASM loading
         process.env.NODE_ENV === 'development'
-            ? "connect-src 'self' https://cdn.jsdelivr.net http://localhost:3001"
-            : "connect-src 'self' https://cdn.jsdelivr.net",
+            ? "connect-src 'self' https://cdn.jsdelivr.net http://localhost:3001 data: blob:"
+            : "connect-src 'self' https://cdn.jsdelivr.net data: blob:",
 
         // Media: self only
         "media-src 'self'",
