@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to BillSaver will be documented in this file. New entries to be listed below the last entry. 
+All notable changes to BillSaver will be documented in this file. New entries to be listed below the last entry, in chr. 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2026-01-06
+## [1.2.0] - 2026-01-06
 
 ### 🎉 Phase 3: Backend Infrastructure Release
 
@@ -136,7 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.1.0] - 2026-01-07
+## [1.3.0] - 2026-01-07
 
 ### 🔒 Major Security Hardening Release
 
@@ -288,46 +288,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
-
-### Planned Features
-
-#### Version 2.1.0 (Phase 4: Enterprise Collaboration)
-- [ ] Multi-tenant organization management
-- [ ] Encrypted team collaboration features
-- [ ] Privacy-preserving analytics dashboard
-- [ ] EHR system integration APIs
-- [ ] Compliance monitoring and reporting
-
-#### Version 3.0.0 (Phase 5: Predictive Intelligence)
-- [ ] Federated learning for predictive models
-- [ ] AI-powered quality improvement recommendations
-- [ ] Population health analytics with differential privacy
-- [ ] Predictive compliance monitoring
-- [ ] Automated documentation improvement plans
-
----
-
-## Migration Guides
-
-### Upgrading to Future Versions
-
-When new versions are released, migration guides will be provided here.
-
----
-
-## Breaking Changes
-
-None yet - this is the initial release.
-
----
-
-## Deprecations
-
-None yet - this is the initial release.
-
----
-
 ## [1.5.0] - 2026-01-09
 
 ### 🎯 Revenue Calculation Accuracy & Investor-Ready Enhancements
@@ -394,6 +354,133 @@ None yet - this is the initial release.
 
 ---
 
+## [1.6.0] - 2026-01-09
+
+### 🎯 Enhanced Loading States & Progress
+
+Major UX overhaul transforming the loading experience from weakness to strength. Eliminated awkward wait during OCR processing with intelligent progress tracking, educational content, and polished animations.
+
+#### Added
+
+- **Smart Progress Indicator**
+  - 7-stage intelligent progress tracking (Init → Extract → OCR → Analyze → Codes → Revenue → Finalize)
+  - Real-time context-aware status messages
+  - Time estimation with seconds remaining display
+  - Animated gradient progress bar with pulsing glow effect
+  - Visual stage indicators (7 dots showing past, current, and future stages)
+  - `ProgressTracker` utility class for state management
+  - `ProgressStage` component with smooth transitions
+
+- **Educational Loading Tips**
+  - Rotating carousel of 10 educational tips during processing
+  - 5 categories: Revenue facts, Documentation guidelines, Coding practices, Value props, Compliance
+  - 4-second rotation with smooth fade animations
+  - Randomized starting tip for variety
+  - `LoadingTips` carousel component
+  - Tips database with categorization
+
+- **Enhanced Error Handling**
+  - 5 specific error types with custom styling and messages:
+    - Corrupt PDF (red/orange gradient)
+    - Empty PDF (yellow/orange gradient)
+    - No Medical Content (blue/purple gradient)
+    - File Too Large (orange/red gradient)
+    - OCR Timeout (purple/pink gradient)
+  - Helpful, actionable error messages
+  - 3 recovery actions per error (Try Example, Try Again, Upload Different File)
+  - Animated error icon with spring effect
+  - `ErrorDisplay` component with professional design
+
+- **Skeleton Loading Screens**
+  - Results preview displaying at 90%+ progress
+  - Realistic layout mimicking final results (score ring, revenue card, gap cards)
+  - Shimmer animation effect on all skeleton elements
+  - 800ms display time for smooth transition
+  - `ResultsSkeleton` component
+
+- **Smooth Transitions**
+  - Fade-in animation for results display
+  - Proper delays between stage transitions (200-400ms)
+  - No layout shift issues
+  - Buttery-smooth flow from upload to results
+
+#### Changed
+
+- Updated processing flow with intelligent stage tracking
+- Replaced generic progress messages with context-aware updates
+- Enhanced error states from generic to specific and helpful
+- Improved transition timing for smoother animations
+
+#### Fixed
+
+- Animation stutters during stage transitions
+- Layout shift when results load (top bar jumping)
+- Progress appearing stuck during long operations
+- Generic error messages not providing actionable guidance
+
+#### Technical Details
+
+**New Components**: 5
+- `ProgressStage.tsx` - Multi-stage progress display
+- `LoadingTips.tsx` - Educational tips carousel
+- `ErrorDisplay.tsx` - Professional error handling
+- `ResultsSkeleton.tsx` - Loading skeleton preview
+
+**New Utilities**: 2
+- `progress-tracker.ts` - Progress state management (180 lines)
+- `loading-tips.ts` - Tips database (75 lines)
+
+**CSS Enhancements**:
+- Shimmer keyframe animation for skeleton screens
+- Progress bar gradient animations
+- Stage indicator styling
+
+**Lines of Code Added**: ~800
+**Build Time**: ~5 seconds
+**Zero Breaking Changes**: ✅
+
+---
+
+## [Unreleased]
+
+### Planned Features
+
+#### Version 2.1.0 (Phase 4: Enterprise Collaboration)
+- [ ] Multi-tenant organization management
+- [ ] Encrypted team collaboration features
+- [ ] Privacy-preserving analytics dashboard
+- [ ] EHR system integration APIs
+- [ ] Compliance monitoring and reporting
+
+#### Version 3.0.0 (Phase 5: Predictive Intelligence)
+- [ ] Federated learning for predictive models
+- [ ] AI-powered quality improvement recommendations
+- [ ] Population health analytics with differential privacy
+- [ ] Predictive compliance monitoring
+- [ ] Automated documentation improvement plans
+
+---
+
+## Migration Guides
+
+### Upgrading to Future Versions
+
+When new versions are released, migration guides will be provided here.
+
+---
+
+## Breaking Changes
+
+None yet - this is the initial release.
+
+---
+
+## Deprecations
+
+None yet - this is the initial release.
+
+---
+
 ## Security Updates
 
 Security-related changes will be highlighted here.
@@ -409,4 +496,4 @@ Security-related changes will be highlighted here.
 
 ---
 
-**Current Version**: 1.5.0 (Revenue Calculation Accuracy & Investor-Ready Enhancements)
+**Current Version**: 1.6.0 (Enhanced Loading States & Progress)

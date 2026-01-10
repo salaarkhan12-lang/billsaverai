@@ -1,6 +1,6 @@
 {
   "name": "billsaver",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "description": "AI-powered medical documentation analysis with HIPAA-compliant infrastructure to optimize billing accuracy and prevent revenue loss",
   "repository": {
     "type": "git",

@@ -4,10 +4,10 @@
 
 ![BillSaver](https://img.shields.io/badge/Next.js-16.1-black?style=flat-square&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
+![Version](https://img.shields.io/badge/version-1.6.0-blue?style=flat-square)
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8?style=flat-square&logo=tailwind-css)
 ![AWS](https://img.shields.io/badge/AWS-HIPAA%20Compliant-orange?style=flat-square&logo=amazon-aws)
-![Status](https://img.shields.io/badge/Status-v1.5.0%20Revenue%20Accuracy-success?style=flat-square)
 ![Security](https://img.shields.io/badge/Security-OWASP%202024-green?style=flat-square&logo=security)
 
 ---
@@ -339,7 +339,10 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and roadmap.
 
-**Current Version: 1.5.0 (Revenue Calculation Accuracy & Investor-Ready Enhancements)**
+### Version History
+- **v1.6.0** (2026-01-09) - Enhanced Loading States & Progress
+- **v1.5.0** (2026-01-08) - Revenue Calculation Accuracy & Investor-Ready Enhancements
+- **v1.4.0** (2026-01-07) - Modular Extraction Engine & CPT Intelligences
 
 ---
 
@@ -376,17 +379,18 @@ This project is for educational and internal use. Ensure compliance with healthc
 
 ## 🎉 Status
 
-✅ **v1.5.0 - Revenue Calculation Accuracy & Investor-Ready**  
+✅ **v1.6.0 - Enhanced Loading States & Progress**  
+✅ **Intelligent 7-Stage Progress Tracking**  
+✅ **Educational Loading Tips (10 rotating tips)**  
+✅ **Professional Error Handling (5 error types)**  
+✅ **Skeleton Screens with Shimmer Effects**  
+✅ **Smooth Animations & Transitions**  
 ✅ **HIPAA-Compliant with Zero PHI Persistence**  
-✅ **OWASP 2024 Security Standards**  
 ✅ **Multi-Payer Revenue Comparison**  
-✅ **Validated Revenue Calculations**  
-✅ **Comprehensive Documentation (300+ pages)**  
 ✅ **Production Ready**  
-✅ **All Tests Passing (18 revenue tests)**  
+✅ **All Tests Passing**  
 ✅ **TypeScript Strict Mode**  
-✅ **Zero Build Errors**  
-✅ **Fully Documented**
+✅ **Zero Build Errors**
 
 ---
 

@@ -8,15 +8,20 @@ import { BatchUploadZone } from "@/components/BatchUploadZone";
 import { BatchResults } from "@/components/BatchResults";
 import { ParticleField } from "@/components/ParticleField";
 import { EnhancedProgress } from "@/components/EnhancedProgress";
+import { ProgressStage } from "@/components/ProgressStage";
+import { LoadingTips } from "@/components/LoadingTips";
+import { ErrorDisplay, type ErrorType, type ErrorAction } from "@/components/ErrorDisplay";
+import { ResultsSkeleton } from "@/components/ResultsSkeleton";
 import { Dashboard } from "@/components/Dashboard";
 import { InvestorPresentationMode } from "@/components/InvestorPresentationMode";
-import { PayerSelector } from "@/components/dashboard/payer-selector";  // NEW
+import { PayerSelector } from "@/components/dashboard/payer-selector";
 import { parsePDF } from "@/lib/blackbox_pdf-parser";
 import { analyzeDocument, type AnalysisResult } from "@/lib/billing-rules";
 import { createBatchProcessor, type BatchItem } from "@/lib/batch-processor";
 import type { AnalysisHistoryItem } from "@/lib/history-storage";
 import { DEMO_ANALYSIS_RESULT } from "@/lib/demo-data";
 import { getHistoryStats } from "@/lib/history-storage";
+import { ProgressTracker, type ProgressUpdate } from "@/lib/progress-tracker";
 
 type AppState = "idle" | "processing" | "results" | "batch-processing" | "batch-results" | "error";
 type ProcessingMode = "single" | "batch";
@@ -24,12 +29,14 @@ type ProcessingMode = "single" | "batch";
 interface ErrorInfo {
   message: string;
   details?: string;
+  type?: ErrorType;
 }
 
 export default function Home() {
   const [appState, setAppState] = useState<AppState>("idle");
   const [processingMode, setProcessingMode] = useState<ProcessingMode>("single");
   const [progress, setProgress] = useState(0);
+  const [progressUpdate, setProgressUpdate] = useState<ProgressUpdate | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [currentFile, setCurrentFile] = useState<File | undefined>(undefined);
@@ -84,76 +91,100 @@ export default function Home() {
     setCurrentFile(file);
     setAppState("processing");
     setProgress(0);
+    setProgressUpdate(null);
     setError(null);
     setStatusMessage("");
 
-    let progressInterval: NodeJS.Timeout | null = null;
+    // Create progress tracker
+    const tracker = new ProgressTracker((update) => {
+      setProgressUpdate(update);
+      setProgress(update.overallPercent);
+      setStatusMessage(update.message);
+    });
 
     try {
-      // Simulate progress for better UX
-      progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            if (progressInterval) clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + Math.random() * 15;
-        });
-      }, 200);
+      // Stage 1: Initialize
+      tracker.start();
+      await new Promise(resolve => setTimeout(resolve, 400)); // Let init animation complete
+
+      // Stage 2: Extract text
+      tracker.setStage("extract", 0);
+      await new Promise(resolve => setTimeout(resolve, 300)); // Smooth transition
 
       // Parse PDF
       console.log("Starting PDF parse...");
-      setStatusMessage("Reading PDF...");
       const parseResult = await parsePDF(file, (ocrProgress) => {
-        // Switch to real progress if OCR kicks in
-        if (progressInterval) clearInterval(progressInterval);
-        setStatusMessage(`Extracting text with OCR... ${Math.round(ocrProgress)}%`);
-        setProgress(ocrProgress);
+        // Stage 3: OCR (if needed)
+        if (ocrProgress > 0) {
+          tracker.setStage("ocr", ocrProgress);
+        }
       });
       console.log("PDF parsed successfully:", parseResult.pageCount, "pages");
       console.log("Extracted text length:", parseResult.text.length, "characters");
       console.log("Used OCR:", parseResult.usedOCR);
 
-      if (parseResult.usedOCR) {
-        console.log("✓ OCR was used to extract text from image-based PDF");
-        setStatusMessage("OCR extraction complete!");
-      } else {
-        setStatusMessage("Text extraction complete!");
+      if (!parseResult.usedOCR) {
+        // Skip OCR stage if not used
+        tracker.setStage("extract", 100);
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
-      setProgress(50);
 
-      // Small delay for visual effect
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Stage 4: Analyze documentation
+      tracker.setStage("analyze", 0);
+      await new Promise((resolve) => setTimeout(resolve, 300)); // Let stage transition animate
+      tracker.updateProgress(50);
 
-      // Analyze document
       console.log("Starting analysis...");
-      setStatusMessage("Analyzing medical document with AI...");
       const analysisResult = await analyzeDocument(parseResult, {
-        payerId: selectedPayer,  // Pass selected payer
+        payerId: selectedPayer,
         visitsPerYear: 52,
       });
       console.log("Analysis complete:", analysisResult);
-      setStatusMessage("AI analysis complete!");
 
-      if (progressInterval) clearInterval(progressInterval);
-      setProgress(100);
+      // Stage 5: Extract codes
+      tracker.setStage("codes", 100);
+      await new Promise((resolve) => setTimeout(resolve, 300)); // Smooth transition
 
-      // Transition to results
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Stage 6: Calculate revenue
+      tracker.setStage("revenue", 100);
+      await new Promise((resolve) => setTimeout(resolve, 300)); // Smooth transition
+
+      // Stage 7: Finalize
+      tracker.setStage("finalize", 100);
+      await new Promise((resolve) => setTimeout(resolve, 200)); // Brief pause
+      tracker.complete();
+
+      // Give skeleton time to display and animate (shows at 90%+)
+      await new Promise((resolve) => setTimeout(resolve, 800)); // Let skeleton shimmer be visible
+
       setResult(analysisResult);
       setAppState("results");
     } catch (error) {
       console.error("Error processing file:", error);
       console.error("Error details:", error instanceof Error ? error.message : String(error));
 
-      if (progressInterval) clearInterval(progressInterval);
+      // Determine error type based on error message
+      let errorType: ErrorType = "generic";
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes("corrupt") || errorMessage.includes("invalid PDF")) {
+        errorType = "corrupt_pdf";
+      } else if (errorMessage.includes("empty") || errorMessage.includes("no text")) {
+        errorType = "empty_pdf";
+      } else if (errorMessage.includes("timeout")) {
+        errorType = "ocr_timeout";
+      } else if (errorMessage.includes("too large") || errorMessage.includes("size")) {
+        errorType = "file_too_large";
+      }
 
       setError({
-        message: error instanceof Error ? error.message : "An unknown error occurred",
+        message: errorMessage,
         details: error instanceof Error ? error.stack : undefined,
+        type: errorType
       });
       setAppState("error");
       setProgress(0);
+      setProgressUpdate(null);
     }
   }, []);
 
@@ -479,46 +510,72 @@ export default function Home() {
           )}
 
           {appState === "processing" && (
-            <motion.div
-              key="processing"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.5 }}
-              className="w-full max-w-2xl"
-            >
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-                <EnhancedProgress
-                  progress={progress}
-                  statusMessage={statusMessage}
-                  fileName={fileName}
-                />
-                <div className="text-center text-sm text-gray-400 mt-4">
-                  {Math.round(progress)}% complete
-                </div>
+            <>
+              {progress < 90 ? (
+                <motion.div
+                  key="processing"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.5 }}
+                  className="w-full max-w-2xl"
+                >
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+                    {/* File Name */}
+                    <div className="text-center mb-6">
+                      <div className="text-white/60 text-sm mb-1">Processing</div>
+                      <div className="text-white font-semibold truncate">{fileName}</div>
+                    </div>
 
-                {/* Animated loading indicator */}
-                <div className="mt-8 flex justify-center">
-                  <div className="flex space-x-2">
-                    {[0, 1, 2].map((i) => (
-                      <motion.div
-                        key={i}
-                        className="h-3 w-3 rounded-full bg-blue-500"
-                        animate={{
-                          scale: [1, 1.5, 1],
-                          opacity: [0.5, 1, 0.5],
-                        }}
-                        transition={{
-                          duration: 1.5,
-                          repeat: Infinity,
-                          delay: i * 0.2,
-                        }}
+                    {/* New Smart Progress Indicator */}
+                    {progressUpdate ? (
+                      <ProgressStage update={progressUpdate} className="mb-6" />
+                    ) : (
+                      <EnhancedProgress
+                        progress={progress}
+                        statusMessage={statusMessage}
+                        fileName={fileName}
                       />
-                    ))}
+                    )}
+
+                    {/* Educational Loading Tips */}
+                    <div className="mt-6">
+                      <LoadingTips interval={4000} />
+                    </div>
+
+                    {/* Animated loading indicator */}
+                    <div className="mt-8 flex justify-center">
+                      <div className="flex space-x-2">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            className="h-3 w-3 rounded-full bg-blue-500"
+                            animate={{
+                              scale: [1, 1.5, 1],
+                              opacity: [0.5, 1, 0.5],
+                            }}
+                            transition={{
+                              duration: 1.5,
+                              repeat: Infinity,
+                              delay: i * 0.2,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </motion.div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="skeleton"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <ResultsSkeleton />
+                </motion.div>
+              )}
+            </>
           )}
 
           {appState === "error" && error && (
@@ -530,65 +587,48 @@ export default function Home() {
               transition={{ duration: 0.5 }}
               className="w-full max-w-2xl"
             >
-              <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 backdrop-blur-xl">
-                <div className="mb-6 text-center">
-                  <div className="mb-4 flex justify-center">
-                    <div className="rounded-full bg-red-500/20 p-4">
-                      <svg
-                        className="h-12 w-12 text-red-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                  <h2 className="mb-2 text-2xl font-bold text-white">
-                    Processing Error
-                  </h2>
-                  <p className="text-red-400">{error.message}</p>
-                  {error.details && (
-                    <details className="mt-4 text-left">
-                      <summary className="cursor-pointer text-sm text-gray-400 hover:text-gray-300">
-                        Technical Details
-                      </summary>
-                      <pre className="mt-2 max-h-40 overflow-auto rounded bg-black/20 p-2 text-xs text-gray-500">
-                        {error.details}
-                      </pre>
-                    </details>
-                  )}
-                </div>
+              <ErrorDisplay
+                type={error.type}
+                message={error.message}
+                actions={[
+                  {
+                    label: "🎯 Try Example",
+                    onClick: handleDemoMode,
+                    variant: "primary"
+                  },
+                  {
+                    label: "Try Again",
+                    onClick: handleRetry,
+                    variant: "secondary"
+                  },
+                  {
+                    label: "Upload Different File",
+                    onClick: handleReset,
+                    variant: "secondary"
+                  }
+                ]}
+              />
 
-                <div className="flex justify-center space-x-4">
-                  <button
-                    onClick={handleRetry}
-                    className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/50"
-                  >
-                    Try Again
-                  </button>
-                  <button
-                    onClick={handleReset}
-                    className="rounded-lg border border-white/20 bg-white/5 px-6 py-3 font-semibold text-white transition-all hover:bg-white/10"
-                  >
-                    Upload Different File
-                  </button>
-                </div>
-              </div>
+              {/* Technical Details (Optional) */}
+              {error.details && (
+                <details className="mt-4 text-center">
+                  <summary className="cursor-pointer text-sm text-white/60 hover:text-white/80">
+                    View Technical Details
+                  </summary>
+                  <pre className="mt-2 max-h-40 overflow-auto rounded bg-black/20 p-3 text-xs text-white/50 text-left">
+                    {error.details}
+                  </pre>
+                </details>
+              )}
             </motion.div>
           )}
 
           {appState === "results" && result && (
             <motion.div
               key="results"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.5 }}
               className="w-full max-w-6xl"
             >
