@@ -192,6 +192,13 @@ Total time: 35 minutes including counseling and care coordination
 
 ## Next Steps
 
+### Automated Testing
+See [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md) for:
+- Programmatic file upload
+- JSON result retrieval
+- Browser automation examples
+- CI/CD integration
+
 ### Deploy to Production
 See `claude_DEPLOYMENT.md` for deployment options:
 - **Vercel** (easiest) - 5 minutes

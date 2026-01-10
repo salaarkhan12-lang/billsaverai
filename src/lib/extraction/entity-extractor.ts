@@ -97,7 +97,10 @@ export const MEDICAL_TERM_ALIASES: Record<string, string[]> = {
 };
 
 /**
- * Extract medical entities from sentences
+ * Extract entities from sentences
+ * Uses layered approach:
+ * - Layer 1: Direct code extraction (explicit ICD/CPT codes)
+ * - Layer 2: Keyword matching (medical terms)
  */
 export function extractEntities(
     sentences: TextSpan[],
@@ -106,7 +109,11 @@ export function extractEntities(
     const entities: MedicalEntity[] = [];
 
     for (const sentence of sentences) {
-        // Extract entities from this sentence
+        // Layer 1: Extract explicit codes first (baseline)
+        const explicitCodes = extractExplicitCodes(sentence, sectionName);
+        entities.push(...explicitCodes);
+
+        // Layer 2: Extract from keyword matching
         const sentenceEntities = extractFromSentence(sentence, sectionName);
         entities.push(...sentenceEntities);
     }
@@ -115,6 +122,229 @@ export function extractEntities(
     const unique = deduplicateEntities(entities);
 
     return unique;
+}
+
+/**
+ * Layer 1: Extract explicit medical codes from text
+ * This catches codes written directly in the document (A12.34, 99204, etc.)
+ */
+function extractExplicitCodes(
+    span: TextSpan,
+    sectionName?: string
+): MedicalEntity[] {
+    const entities: MedicalEntity[] = [];
+    const text = span.text;
+
+    // Pattern 1: ICD-10 codes (A12.34 format)
+    // Matches: E11.65, I10, Z59.00, etc.
+    const icd10Pattern = /\b([A-Z][0-9]{2}\.?[0-9]{0,2})\b/g;
+    let match;
+
+
+    while ((match = icd10Pattern.exec(text)) !== null) {
+        const code = match[1];
+        const matchIndex = match.index;
+
+
+        // Validate it looks like a real ICD-10 code
+        if (isValidICD10Format(code)) {
+
+            const entitySpan: TextSpan = {
+                text: span.text,
+                startIndex: span.startIndex + matchIndex,
+                endIndex: span.startIndex + matchIndex + code.length,
+                section: sectionName,
+            };
+
+            const context = analyzeContext(
+                code,
+                entitySpan,
+                sectionName as any || 'other'
+            );
+
+            entities.push({
+                text: code,
+                normalizedText: code.toUpperCase(),
+                type: 'code-icd10' as any,
+                span: entitySpan,
+                context,
+            });
+        } else {
+        }
+    }
+
+
+    // Pattern 2: CPT codes (99204, 80061, etc.)
+    // 5-digit numeric codes
+    const cptPattern = /\b([0-9]{5})\b/g;
+
+    while ((match = cptPattern.exec(text)) !== null) {
+        const code = match[1];
+        const matchIndex = match.index;
+
+
+        // Only extract if it looks like a procedure code (not a random number)
+        if (isLikelyCPTCode(code, text, matchIndex)) {
+
+            const entitySpan: TextSpan = {
+                text: span.text,
+                startIndex: span.startIndex + matchIndex,
+                endIndex: span.startIndex + matchIndex + code.length,
+                section: sectionName,
+            };
+
+            const context = analyzeContext(
+                code,
+                entitySpan,
+                sectionName as any || 'other'
+            );
+
+            entities.push({
+                text: code,
+                normalizedText: code,
+                type: 'code-cpt' as any,
+                span: entitySpan,
+                context,
+            });
+        } else {
+        }
+    }
+
+
+    // Pattern 3: E/M Level Text (convert to CPT codes)
+    // Matches: "Level: Office/Outpt Visit, New, Lvl IV" → 99204
+    const emLevelMatch = text.match(/Level:\s*([^,]+),\s*(New|Established),\s*Lvl\s*(I{1,3}V?|V)/i);
+
+    if (emLevelMatch) {
+        const visitType = emLevelMatch[2].toLowerCase(); // "new" or "established"
+        const level = emLevelMatch[3]; // "IV", "III", "II", "I", "V"
+
+
+        // Map E/M level to CPT code
+        const cptCode = mapEMLevelToCPT(visitType, level);
+
+        if (cptCode) {
+
+            const matchIndex = emLevelMatch.index!;
+            const matchText = emLevelMatch[0];
+
+            const entitySpan: TextSpan = {
+                text: span.text,
+                startIndex: span.startIndex + matchIndex,
+                endIndex: span.startIndex + matchIndex + matchText.length,
+                section: sectionName,
+            };
+
+            const context = analyzeContext(
+                cptCode,
+                entitySpan,
+                sectionName as any || 'other'
+            );
+
+            entities.push({
+                text: matchText,
+                normalizedText: cptCode,
+                type: 'code-cpt' as any,
+                span: entitySpan,
+                context,
+            });
+        } else {
+        }
+    }
+
+
+    return entities;
+}
+
+/**
+ * Validate ICD-10 code format
+ */
+function isValidICD10Format(code: string): boolean {
+    // ICD-10 starts with letter, followed by 2 digits
+    // May have decimal and 1-2 more digits
+    const pattern = /^[A-Z][0-9]{2}\.?[0-9]{0,2}$/;
+    return pattern.test(code);
+}
+
+/**
+ * Check if a 5-digit number is likely a CPT code
+ * Uses context clues to avoid false positives (dates, phone numbers, etc.)
+ */
+function isLikelyCPTCode(code: string, text: string, index: number): boolean {
+    // CPT codes are typically in ranges:
+    // 99000-99999 (E/M, medicine)
+    // 80000-89999 (pathology/lab)
+    // 90000-99999 (medicine)
+    // 00100-09999 (anesthesia)
+    const codeNum = parseInt(code, 10);
+
+    // Quick range check
+    if (codeNum < 10000) {
+        // Could be anesthesia code (00100-09999)
+        // Be more strict
+        const contextBefore = text.substring(Math.max(0, index - 20), index).toLowerCase();
+        if (contextBefore.includes('cpt') || contextBefore.includes('code') || contextBefore.includes('procedure')) {
+            return true;
+        }
+        return false;
+    }
+
+    if (codeNum >= 80000 && codeNum <= 99999) {
+        // Likely CPT range
+        return true;
+    }
+
+    // Context clues for other ranges
+    const contextBefore = text.substring(Math.max(0, index - 30), index).toLowerCase();
+    const contextAfter = text.substring(index + 5, Math.min(text.length, index + 35)).toLowerCase();
+
+    // Look for CPT-related keywords
+    if (
+        contextBefore.includes('cpt') ||
+        contextBefore.includes('code') ||
+        contextBefore.includes('procedure') ||
+        contextBefore.includes('level') ||
+        contextAfter.includes('office') ||
+        contextAfter.includes('visit') ||
+        contextAfter.includes('consultation')
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Map E/M level text to CPT code
+ * Converts "New, Lvl IV" → 99204
+ */
+function mapEMLevelToCPT(visitType: string, level: string): string | null {
+    // Normalize level (IV, III, II, I, V)
+    const levelMap: Record<string, number> = {
+        'I': 1,
+        'II': 2,
+        'III': 3,
+        'IV': 4,
+        'V': 5,
+    };
+
+    const levelNum = levelMap[level.toUpperCase()];
+    if (!levelNum) return null;
+
+    // Map to CPT codes
+    if (visitType === 'new') {
+        // New patient: 99202-99205 (99201 deleted in 2021)
+        // Level I → 99202, Level II → 99203, Level III → 99204, Level IV → 99205
+        const codes = ['99202', '99203', '99204', '99205'];
+        return codes[levelNum - 1] || null;
+    } else if (visitType === 'established') {
+        // Established patient: 99211-99215
+        // Level I → 99211, Level II → 99212, etc.
+        const codes = ['99211', '99212', '99213', '99214', '99215'];
+        return codes[levelNum - 1] || null;
+    }
+
+    return null;
 }
 
 /**
@@ -220,7 +450,15 @@ function deduplicateEntities(entities: MedicalEntity[]): MedicalEntity[] {
  * Returns only entities that should be used for code extraction
  */
 export function filterEntitiesByContext(entities: MedicalEntity[]): MedicalEntity[] {
-    return entities.filter(entity => {
+    const filtered = entities.filter(entity => {
+        // CRITICAL: Always preserve explicit codes (Layer 1)
+        // These are codes written directly in the document and should NEVER be filtered
+        if (entity.type === 'code-icd10' || entity.type === 'code-cpt') {
+            return true;
+        }
+
+        // For keyword-based entities (Layer 2), apply contextual filtering
+
         // Exclude negated entities
         if (entity.context.isNegated) {
             return false;
@@ -239,6 +477,8 @@ export function filterEntitiesByContext(entities: MedicalEntity[]): MedicalEntit
         // Include everything else
         return true;
     });
+
+    return filtered;
 }
 
 /**

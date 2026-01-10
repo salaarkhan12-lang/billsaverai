@@ -121,27 +121,87 @@ export class CPTAdapter implements CodeAdapter {
     /**
      * Extract CPT codes from document context
      * 
-     * EDUCATIONAL NOTE - CPT extraction strategy
-     * =========================================
-     * Unlike ICD-10 (which matches text to codes), CPT extraction is ANALYTICAL:
-     * 1. Analyze document complexity (# of conditions, problems addressed)
-     * 2. Determine appropriate E/M level (99213, 99214, 99215)
-     * 3. Check for add-on code opportunities (CCM, TCM, RPM)
-     * 4. Validate documentation supports the selected level
+     * UPDATED - Layered Approach:
+     * ==========================
+     * Layer 1: Check for explicit CPT codes in text (99204, 80061, etc.)
+     * Layer 2: Analytical E/M determination based on complexity
      * 
-     * This is why CPT coding is harder - it's not "find keyword X → code Y"
-     * It's "analyze entire encounter → determine justified level"
+     * This ensures we never miss explicitly documented codes!
      */
     extractSync(context: DocumentContext, entities: MedicalEntity[]): ExtractedCode[] {
         const codes: ExtractedCode[] = [];
 
-        // Step 1: Determine E/M level based on documented complexity
-        const emCode = this.determineEMLevel(context, entities);
-        if (emCode) {
-            codes.push(emCode);
+        // Layer 1: Process explicit CPT code entities
+        const explicitCPT = entities.filter(e => e.type === 'code-cpt');
+
+        for (const entity of explicitCPT) {
+            const cptCode = entity.normalizedText;
+            const codeInfo = CPT_CODES[cptCode];
+
+            if (codeInfo) {
+                // Found in database - use it
+                const evidence: EvidenceLocation[] = [{
+                    text: entity.text,
+                    section: entity.context.section,
+                    snippet: entity.span.text,
+                }];
+
+                codes.push({
+                    code: cptCode,
+                    codeSystem: 'cpt',
+                    description: codeInfo.description,
+                    evidence,
+                    matchType: 'exact', // Explicit code = exact match
+                    confidence: {
+                        overall: 0.95, // High confidence for explicit codes
+                        breakdown: {
+                            match: 1.0,
+                            context: 0.9,
+                            specificity: 1.0,
+                            documentation: 0.95,
+                        },
+                        reasoning: 'Explicit CPT code found in document',
+                    },
+                    category: codeInfo.category,
+                    rvu: codeInfo.rvu,
+                });
+            } else {
+                // Unknown code - still include it
+                codes.push({
+                    code: cptCode,
+                    codeSystem: 'cpt',
+                    description: `CPT code ${cptCode} (not in database)`,
+                    evidence: [{
+                        text: entity.text,
+                        section: entity.context.section,
+                        snippet: entity.span.text,
+                    }],
+                    matchType: 'exact',
+                    confidence: {
+                        overall: 0.7,
+                        breakdown: {
+                            match: 0.95,
+                            context: 0.8,
+                            specificity: 0.9,
+                            documentation: 0.6,
+                        },
+                        reasoning: 'Explicit code found but not in CPT database',
+                    },
+                    category: 'procedure',
+                });
+            }
         }
 
-        // Step 2: Check for add-on codes (CCM, TCM, etc.)
+        // Layer 2: Analytical E/M determination (only if no E/M code found in Layer 1)
+        const hasEMCode = codes.some(c => /^992\d\d$/.test(c.code));
+        if (!hasEMCode) {
+            const emCode = this.determineEMLevel(context, entities);
+            if (emCode) {
+                codes.push(emCode);
+            }
+        }
+
+        // Step 3: Check for add-on codes (CCM, TCM, etc.)
         const addOnCodes = this.detectAddOnCodes(context, entities);
         codes.push(...addOnCodes);
 

@@ -109,26 +109,33 @@ export function calculateRevenue(
     const currentPayerRate = calculatePayerRate(currentCPT, payerId);
     const potentialPayerRate = calculatePayerRate(potentialCPT, payerId);
 
-    // Calculate gaps
+    // Calculate per-visit gap
     const perVisitGap = potentialPayerRate - currentPayerRate;
-    const annualizedGap = Math.round(perVisitGap * visitsPerYear * 100) / 100;
+
+    // Calculate annualized gap
+    const annualizedGap = perVisitGap * visitsPerYear;
+
+    // Round to 2 decimal places to avoid floating point precision issues
+    // e.g., 49.400000000000006 -> 49.4
+    const roundedPerVisitGap = Math.round(perVisitGap * 100) / 100;
+    const roundedAnnualizedGap = Math.round(annualizedGap * 100) / 100;
 
     return {
         currentLevel: {
             cptCode: currentCPT,
             description: currentCode.description,
             baseRate: currentCode.baseRate,
-            payerRate: currentPayerRate,
+            payerRate: Math.round(currentPayerRate * 100) / 100,
             payer: payerId,
         },
         potentialLevel: {
             cptCode: potentialCPT,
             description: potentialCode.description,
             baseRate: potentialCode.baseRate,
-            payerRate: potentialPayerRate,
+            payerRate: Math.round(potentialPayerRate * 100) / 100,
         },
-        perVisitGap,
-        annualizedGap,
+        perVisitGap: roundedPerVisitGap,
+        annualizedGap: roundedAnnualizedGap,
         confidence,
     };
 }
@@ -136,14 +143,37 @@ export function calculateRevenue(
 /**
  * Calculate total revenue impact for multiple gaps
  * 
+ * IMPORTANT: This function deduplicates overlapping opportunities.
+ * Multiple gaps may prevent the SAME CPT upgrade (e.g., incomplete HPI
+ * and missing time documentation both preventing 99213→99214 upgrade).
+ * We group by unique CPT pair and take the maximum revenue to avoid
+ * inflating totals by counting the same opportunity multiple times.
+ * 
  * @param gaps Array of revenue calculations
  * @returns Total per-visit and annualized revenue loss
  */
 export function calculateTotalRevenue(
     gaps: RevenueCalculation[]
 ): { perVisit: number; annualized: number } {
-    const perVisit = gaps.reduce((sum, gap) => sum + gap.perVisitGap, 0);
-    const annualized = gaps.reduce((sum, gap) => sum + gap.annualizedGap, 0);
+    // Group by unique CPT upgrade pairs (currentCPT -> potentialCPT)
+    // Multiple gaps may block the same upgrade, so we deduplicate
+    const opportunityMap = new Map<string, RevenueCalculation>();
+
+    for (const gap of gaps) {
+        const key = `${gap.currentLevel.cptCode}->${gap.potentialLevel.cptCode}`;
+        const existing = opportunityMap.get(key);
+
+        // Keep the higher revenue calculation for duplicate opportunities
+        // This assumes fixing any ONE of the overlapping gaps unlocks the upgrade
+        if (!existing || gap.annualizedGap > existing.annualizedGap) {
+            opportunityMap.set(key, gap);
+        }
+    }
+
+    // Sum only the unique opportunities (no double-counting)
+    const uniqueGaps = Array.from(opportunityMap.values());
+    const perVisit = uniqueGaps.reduce((sum, gap) => sum + gap.perVisitGap, 0);
+    const annualized = uniqueGaps.reduce((sum, gap) => sum + gap.annualizedGap, 0);
 
     return {
         perVisit: Math.round(perVisit * 100) / 100,
@@ -159,6 +189,48 @@ export function calculateTotalRevenue(
  */
 export function formatRevenueGap(calc: RevenueCalculation): string {
     return `${formatCurrency(calc.perVisitGap)}/visit (${formatCurrency(calc.annualizedGap)}/year)`;
+}
+
+/**
+ * Calculate revenue for documented procedures/labs/immunizations
+ * 
+ * Unlike E/M gap revenue (which represents "at risk" revenue from gaps),
+ * procedure revenue represents DOCUMENTED billable services that were
+ * performed and should be billed.
+ * 
+ * @param cptCode CPT code for the procedure/lab/immunization
+ * @param payerId Payer identifier (e.g., "bcbs-national")
+ * @param occurrences Number of times the procedure was performed (default: 1)
+ * @returns Procedure revenue details
+ * @throws Error if CPT code is invalid
+ * 
+ * @example
+ * ```typescript
+ * const lipidPanel = calculateProcedureRevenue('80061', 'bcbs-national', 1);
+ * console.log(lipidPanel.revenue); // $24.30 (Medicare $18 × BCBS 1.35x)
+ * ```
+ */
+export function calculateProcedureRevenue(
+    cptCode: string,
+    payerId: string,
+    occurrences: number = 1
+): { cptCode: string; description: string; revenue: number } {
+    const code = getCPTCode(cptCode);
+    if (!code) {
+        throw new Error(`Invalid CPT code: ${cptCode}`);
+    }
+
+    // Calculate payer-specific rate
+    const payerRate = calculatePayerRate(cptCode, payerId);
+
+    // Multiply by occurrences (e.g., 2 immunizations = 2× the rate)
+    const totalRevenue = Math.round(payerRate * occurrences * 100) / 100;
+
+    return {
+        cptCode,
+        description: code.description,
+        revenue: totalRevenue,
+    };
 }
 
 /**

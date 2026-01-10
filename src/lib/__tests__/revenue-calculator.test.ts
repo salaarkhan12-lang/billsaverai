@@ -4,7 +4,7 @@
  * Tests for CPT pricing and commercial payer revenue calculations
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect } from 'vitest';
 import {
     calculateRevenue,
     calculateTotalRevenue,
@@ -13,6 +13,7 @@ import {
     estimateVisitsPerYear,
     toLegacyRevenueString,
     generateRevenueSummary,
+    calculateProcedureRevenue, // NEW import
 } from '../revenue-calculator';
 import { PAYER_FEE_SCHEDULES } from '../payer-fee-schedules';
 import { CPT_CODES } from '../cpt-database';
@@ -106,7 +107,7 @@ describe('Revenue Calculator', () => {
     });
 
     describe('calculateTotalRevenue', () => {
-        it('sums multiple revenue calculations', () => {
+        it('sums revenue for different CPT upgrades', () => {
             const gap1 = calculateRevenue({
                 currentCPT: '99213',
                 potentialCPT: '99214',
@@ -131,6 +132,71 @@ describe('Revenue Calculator', () => {
             const total = calculateTotalRevenue([]);
             expect(total.perVisit).toBe(0);
             expect(total.annualized).toBe(0);
+        });
+
+        it('deduplicates revenue for same CPT upgrade', () => {
+            // Three gaps all preventing the same 99213->99214 upgrade
+            // Should NOT sum all three, but take the max (they're all identical anyway)
+            const gap1 = calculateRevenue({
+                currentCPT: '99213',
+                potentialCPT: '99214',
+                payerId: 'bcbs-national',
+                visitsPerYear: 52,
+            });
+
+            const gap2 = calculateRevenue({
+                currentCPT: '99213',
+                potentialCPT: '99214',
+                payerId: 'bcbs-national',
+                visitsPerYear: 52,
+            });
+
+            const gap3 = calculateRevenue({
+                currentCPT: '99213',
+                potentialCPT: '99214',
+                payerId: 'bcbs-national',
+                visitsPerYear: 52,
+            });
+
+            const total = calculateTotalRevenue([gap1, gap2, gap3]);
+
+            // Should equal ONE gap's value, not the sum of all three
+            expect(total.perVisit).toBe(gap1.perVisitGap);
+            expect(total.annualized).toBe(gap1.annualizedGap);
+            expect(total.annualized).not.toBe(gap1.annualizedGap * 3);
+        });
+
+        it('handles mix of duplicate and unique CPT upgrades', () => {
+            // Two gaps for 99213->99214 (duplicates)
+            const hpiGap = calculateRevenue({
+                currentCPT: '99213',
+                potentialCPT: '99214',
+                payerId: 'bcbs-national',
+                visitsPerYear: 52,
+            });
+
+            const timeGap = calculateRevenue({
+                currentCPT: '99213',
+                potentialCPT: '99214',
+                payerId: 'bcbs-national',
+                visitsPerYear: 52,
+            });
+
+            // One gap for different upgrade (99212->99213)
+            const differentGap = calculateRevenue({
+                currentCPT: '99212',
+                potentialCPT: '99213',
+                payerId: 'bcbs-national',
+                visitsPerYear: 52,
+            });
+
+            const total = calculateTotalRevenue([hpiGap, timeGap, differentGap]);
+
+            // Should be: max(hpiGap, timeGap) + differentGap
+            // Since hpiGap and timeGap are identical, max = hpiGap
+            const expected = hpiGap.annualizedGap + differentGap.annualizedGap;
+            expect(total.annualized).toBeCloseTo(expected, 2);
+            expect(total.perVisit).toBeCloseTo(hpiGap.perVisitGap + differentGap.perVisitGap, 2);
         });
     });
 
@@ -189,7 +255,7 @@ describe('Revenue Calculator', () => {
     });
 
     describe('toLegacyRevenueString', () => {
-        it('converts to legacy format', () => {
+        it('converts to new human-readable format', () => {
             const calc = calculateRevenue({
                 currentCPT: '99213',
                 potentialCPT: '99214',
@@ -197,7 +263,10 @@ describe('Revenue Calculator', () => {
             });
 
             const legacy = toLegacyRevenueString(calc);
-            expect(legacy).toMatch(/\$51-2668/);
+            // New format: "$51/visit ($2,667/year)"
+            expect(legacy).toMatch(/\$\d+\/visit \(\$[\d,]+\/year\)/);
+            expect(legacy).toContain('/visit');
+            expect(legacy).toContain('/year');
         });
     });
 
@@ -257,6 +326,48 @@ describe('Revenue Calculator', () => {
 
             expect(calc.perVisitGap).toBe(115.00);
             expect(calc.annualizedGap).toBe(1380.00);
+        });
+    });
+
+    describe('calculateProcedureRevenue', () => {
+        it('calculates lab panel revenue correctly', () => {
+            const lipidPanel = calculateProcedureRevenue('80061', 'bcbs-national', 1);
+
+            // Lipid Panel: Medicare $18 × BCBS 1.35x = $24.30
+            expect(lipidPanel.cptCode).toBe('80061');
+            expect(lipidPanel.description).toContain('Lipid');
+            expect(lipidPanel.revenue).toBe(24.30);
+        });
+
+        it('calculates immunization revenue correctly', () => {
+            const immunization = calculateProcedureRevenue('90471', 'uhc-national', 1);
+
+            // Immunization: Medicare $23 × UHC 1.30x = $29.90
+            expect(immunization.cptCode).toBe('90471');
+            expect(immunization.description).toContain('Immunization');
+            expect(immunization.revenue).toBe(29.90);
+        });
+
+        it('calculates procedure revenue correctly', () => {
+            const woundRepair = calculateProcedureRevenue('12001', 'aetna-national', 1);
+
+            // Wound Repair: Medicare $125 × Aetna 1.40x = $175.00
+            expect(woundRepair.cptCode).toBe('12001');
+            expect(woundRepair.description).toContain('Wound');
+            expect(woundRepair.revenue).toBe(175.00);
+        });
+
+        it('handles multiple occurrences', () => {
+            const multipleImmunizations = calculateProcedureRevenue('90472', 'bcbs-national', 3);
+
+            // Additional immunization: Medicare $18 × BCBS 1.35x × 3 = $72.90
+            expect(multipleImmunizations.revenue).toBe(72.90);
+        });
+
+        it('throws error for invalid CPT code', () => {
+            expect(() => {
+                calculateProcedureRevenue('INVALID', 'bcbs-national', 1);
+            }).toThrow('Invalid CPT code');
         });
     });
 });

@@ -135,9 +135,15 @@ export default function Home() {
       tracker.updateProgress(50);
 
       console.log("Starting analysis...");
+
+      // Extract both ICD-10 and CPT codes BEFORE analysis
+      const { extractCodesFromText } = await import('@/lib/billing-code-analyzer');
+      const extractedCodes = extractCodesFromText(parseResult.text);
+
       const analysisResult = await analyzeDocument(parseResult, {
         payerId: selectedPayer,
         visitsPerYear: 52,
+        extractedCPT: extractedCodes.cpt, // Pass extracted CPT codes for gap detection
       });
       console.log("Analysis complete:", analysisResult);
 

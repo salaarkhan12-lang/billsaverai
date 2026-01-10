@@ -134,9 +134,83 @@ export class ICD10Adapter implements CodeAdapter {
 
     /**
      * Map a medical entity to ICD-10 codes
+     * Handles both:
+     * - Explicit codes (type: 'code-icd10') from Layer 1 extraction
+     * - Keyword matches (type: 'condition', 'symptom', etc.) from Layer 2
      */
     private mapEntityToICD10(entity: MedicalEntity): ExtractedCode[] {
         const codes: ExtractedCode[] = [];
+
+        // Layer 1: If this is already an explicit code, process it directly
+        if (entity.type === 'code-icd10') {
+            const codeStr = entity.normalizedText;
+            const codeInfo = ICD10_DATABASE[codeStr];
+
+            if (codeInfo) {
+                // Found in database - use it
+                const evidence: EvidenceLocation[] = [{
+                    text: entity.text,
+                    section: entity.context.section,
+                    snippet: entity.span.text.substring(
+                        Math.max(0, entity.span.startIndex - 30),
+                        Math.min(entity.span.text.length, entity.span.endIndex + 30)
+                    ),
+                }];
+
+                const confidence = this.scoreConfidence({
+                    code: codeStr,
+                    codeSystem: 'icd10',
+                    description: codeInfo.description,
+                    evidence,
+                    matchType: 'exact', // Explicit code = exact match
+                } as ExtractedCode, entity.context);
+
+                const extractedCode: ExtractedCode = {
+                    code: codeStr,
+                    codeSystem: 'icd10' as const,
+                    description: codeInfo.description,
+                    evidence,
+                    matchType: 'exact',
+                    confidence,
+                    category: codeInfo.category,
+                    isHCC: codeInfo.isHCC,
+                };
+
+                codes.push(extractedCode);
+            } else {
+                // Code not in database - still include it with lower confidence
+                const evidence: EvidenceLocation[] = [{
+                    text: entity.text,
+                    section: entity.context.section,
+                    snippet: entity.span.text,
+                }];
+
+                const extractedCode: ExtractedCode = {
+                    code: codeStr,
+                    codeSystem: 'icd10' as const,
+                    description: `ICD-10 code ${codeStr} (not in database)`,
+                    evidence,
+                    matchType: 'exact' as const,
+                    confidence: {
+                        overall: 0.7,
+                        breakdown: {
+                            match: 0.95,
+                            context: 0.8,
+                            specificity: 0.9,
+                            documentation: 0.7,
+                        },
+                        reasoning: 'Explicit code found in document, but not in ICD-10 database',
+                    },
+                    category: 'other',
+                };
+
+                codes.push(extractedCode);
+            }
+
+            return codes;
+        }
+
+        // Layer 2: Keyword matching (original logic)
         const normalizedTerm = entity.normalizedText.toLowerCase();
 
         // Check if we have a mapping for this term

@@ -288,6 +288,32 @@ export function AnalysisResults({ result, fileName, onReset, file }: AnalysisRes
               />
             </div>
 
+            {/* Documented Procedures Section */}
+            {result.documentedProcedures && result.documentedProcedures.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-white font-medium text-sm">Documented Billable Services</h3>
+                  <span className="text-emerald-400 text-xs font-mono">+{result.totalDocumentedRevenue}</span>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 space-y-2">
+                  {result.documentedProcedures.map((proc) => (
+                    <div key={proc.cptCode} className="flex justify-between items-center py-1.5">
+                      <div className="flex-1">
+                        <div className="text-white text-sm font-medium">{proc.description}</div>
+                        <div className="text-white/60 text-xs font-mono">{proc.cptCode} • {proc.category}</div>
+                      </div>
+                      <div className="text-emerald-400 font-mono text-sm font-semibold ml-4">
+                        ${proc.revenue.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-white/40 italic">
+                  ✓ These services were documented and should be billed
+                </div>
+              </div>
+            )}
+
             {/* Billing Codes Section */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
               <RecommendedBillingCodes

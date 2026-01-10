@@ -635,7 +635,63 @@ import { CPTDatabase } from './cpt-database';
 import { RevenueCalculator } from './revenue-calculator';
 ```
 
+
 ---
+
+## 🏗️ E/M Documentation Validation System
+
+### Modular Architecture & Design Philosophy
+
+The E/M (Evaluation and Management) validation system employs a hybrid modular architecture designed for rigorous accuracy and maintainability.
+
+**Design Philosophy**:
+- **Decoupled Validation**: Validators are pure functions that can be tested in isolation.
+- **Hybrid Aggregation**: A dedicated aggregator combines results from independent validators without coupling them.
+- **Explainability**: Every validation decision produces a structured `ValidationResult` with clear reasoning.
+
+### Validator Architecture
+
+```
+                       ┌─────────────────────────┐
+                       │    Hybrid Aggregator    │
+                       └───────────┬─────────────┘
+                                   │
+                  ┌────────────────┴─────────────────┐
+                  ▼                                  ▼
+    ┌───────────────────────────┐      ┌───────────────────────────┐
+    │    Rule-Based Validator   │      │ Context-Aware NLP Validator│
+    │  (CMS Guidelines Engine)  │      │     (Context/NLP Engine)   │
+    └───────────────────────────┘      └───────────────────────────┘
+```
+
+#### Core Components
+
+1.  **Independent Validators**:
+    *   **Rule-Based Validator**: Strictly applies CMS 1995/1997 and 2021 E/M guidelines. It uses deterministic logic to check for mandatory elements (e.g., "Is there a Chief Complaint?").
+    *   **Context-Aware Validator**: Uses NLP and context analysis to evaluate qualitative aspects (e.g., "Is the HPI extended?", "Is MDM complexity moderate or high?").
+
+2.  **ValidationResult Standard**:
+    Each validator outputs a standardized object:
+    ```typescript
+    interface ValidationResult {
+      isValid: boolean;
+      confidence: number; // 0.0 - 1.0
+      reasoning: string[];
+      gaps: DocumentationGap[];
+    }
+    ```
+
+3.  **Hybrid Aggregator**:
+    *   Synthesizes results from both validators.
+    *   Resolves conflicts (e.g., if Rule-Based says "Low" but Context-Aware says "Moderate", it may flag for review or prioritize the stricter rule).
+    *   Generates the final comprehensive score and compliance report.
+
+### Benefits
+
+*   **Testability**: Pure function validators allow for exhaustive unit testing of scenarios.
+*   **Flexibility**: New guidelines can be implemented as new validators or by updating existing ones without breaking the system.
+*   **Accuracy**: Combining deterministic rules with probabilistic NLP reduces both false positives (over-coding) and false negatives (under-coding).
+
 
 ## 🎯 Analysis Engine Architecture
 

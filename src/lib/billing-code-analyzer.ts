@@ -227,14 +227,60 @@ function extractICD10FromGaps(gaps: DocumentationGap[]): string[] {
     return Array.from(codes);
 }
 
-import { extractICD10FromDocument } from '@/lib/icd10-extractor';
+import { ExtractionEngine } from '@/lib/extraction/extraction-engine';
+
+/**
+ * Extract both ICD-10 and CPT codes from document text
+ * Uses comprehensive extraction engine with NLP features
+ */
+export function extractCodesFromText(text: string): {
+    icd10: ICD10Code[];
+    cpt: Array<{ code: string; description: string; confidence: number }>;
+} {
+    const engine = new ExtractionEngine();
+    const result = engine.extractSync(text, {
+        codeSystems: ['icd10', 'cpt'], // Extract BOTH code systems
+        nlp: {
+            enableNegation: true,
+            enableTemporal: true,
+            enableFamilyHistoryFilter: true,
+            enableDifferentialFilter: true,
+            confidenceThreshold: 0.6,
+        },
+    });
+
+    // Convert ICD-10 codes to legacy format
+    const icd10Codes: ICD10Code[] = result.codes
+        .filter(code => code.codeSystem === 'icd10')
+        .map(code => ({
+            code: code.code,
+            description: code.description,
+            category: (code.category as any) || 'symptom',
+            isHCC: code.isHCC,
+            source: 'documented' as const,
+        }));
+
+    // Extract CPT codes in simple format for gap detection
+    const cptCodes = result.codes
+        .filter(code => code.codeSystem === 'cpt')
+        .map(code => ({
+            code: code.code,
+            description: code.description,
+            confidence: code.confidence.overall,
+        }));
+
+    return { icd10: icd10Codes, cpt: cptCodes };
+}
 
 /**
  * Extract ICD-10 codes from document text
  * Uses comprehensive 74K+ code database with section-aware parsing and fuzzy matching
+ * 
+ * @deprecated Use extractCodesFromText for both ICD-10 and CPT codes
  */
 function extractICD10FromText(text: string): ICD10Code[] {
-    return extractICD10FromDocument(text);
+    // Use new helper and return only ICD-10 for backward compatibility
+    return extractCodesFromText(text).icd10;
 }
 
 /**

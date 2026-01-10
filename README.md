@@ -4,7 +4,7 @@
 
 ![BillSaver](https://img.shields.io/badge/Next.js-16.1-black?style=flat-square&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
-![Version](https://img.shields.io/badge/version-1.6.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.7.0-blue?style=flat-square)
 ![React](https://img.shields.io/badge/React-19.2-blue?style=flat-square&logo=react)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8?style=flat-square&logo=tailwind-css)
 ![AWS](https://img.shields.io/badge/AWS-HIPAA%20Compliant-orange?style=flat-square&logo=amazon-aws)
@@ -54,6 +54,7 @@ npm run dev
 - ✅ Diagnosis specificity checking
 - ✅ CPT code extraction and categorization
 - ✅ ICD-10 code validation and conflict detection
+- ✅ **Hybrid E/M Validation**: Dual-engine architecture (Rule-based + Context-Aware NLP) for maximum accuracy
 
 ### 🎨 User Experience
 - Beautiful glassmorphic UI with smooth animations
@@ -80,6 +81,7 @@ npm run dev
 ### For Developers
 - **[Architecture](ARCHITECTURE.md)** - System design, data flow, and patterns
 - **[API Reference](API_REFERENCE.md)** - Complete function and component reference
+- **[API Testing Guide](API_TESTING_GUIDE.md)** - Programmatic testing and automation
 - **[Testing Guide](TESTING_GUIDE.md)** - Comprehensive testing procedures
 - **[Contributing](CONTRIBUTING.md)** - Guidelines for contributors
 - **[Changelog](CHANGELOG.md)** - Version history and roadmap

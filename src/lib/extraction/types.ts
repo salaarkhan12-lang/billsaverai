@@ -79,13 +79,18 @@ export interface MedicalEntity {
     context: EntityContext;
 }
 
+/**
+ * Type of medical entity
+ */
 export type EntityType =
-    | 'condition' // Diagnosis, disease
-    | 'procedure' // CPT procedures
-    | 'symptom' // Signs/symptoms
-    | 'medication'
-    | 'test'
-    | 'anatomical'; // Body part/system
+    | 'condition'    // Medical condition (diabetes, hypertension)
+    | 'symptom'      // Symptom (pain, headache)
+    | 'procedure'    // Medical procedure
+    | 'medication'   // Medication/drug
+    | 'test'         // Lab test or diagnostic
+    | 'code-icd10'   // Explicit ICD-10 code (Layer 1)
+    | 'code-cpt'     // Explicit CPT code (Layer 1)
+    | 'other';       // Other medical entity
 
 /**
  * Context surrounding an entity

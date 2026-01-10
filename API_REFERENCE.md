@@ -8,9 +8,10 @@ Complete reference for all functions, components, and types in BillSaver.
 
 1. [Components](#components)
 2. [Library Functions](#library-functions)
-3. [Backend API Endpoints](#backend-api-endpoints)
-4. [Types & Interfaces](#types--interfaces)
-5. [Utilities](#utilities)
+3. [Testing API Endpoints](#testing-api-endpoints)
+4. [Backend API Endpoints](#backend-api-endpoints)
+5. [Types & Interfaces](#types--interfaces)
+6. [Utilities](#utilities)
 
 ---
 
@@ -275,6 +276,12 @@ console.log(analysis.gaps);              // Array of gaps
 10. Identify E/M level
 11. Generate gap recommendations
 
+**Technical Note**:
+This function orchestrates the **Hybrid E/M Validation System**:
+1. Runs **Rule-Based Validator** (MDM complexity)
+2. Runs **Context-Aware Validator** (Time & Context)
+3. Aggregates results via **Hybrid Aggregator** to determine final E/M level with confidence scores.
+
 ---
 
 ### cn
@@ -307,6 +314,34 @@ const className = cn(
 - Handles conditional classes
 - Resolves Tailwind conflicts
 - Removes duplicates
+
+---
+
+## Testing API Endpoints
+
+For automated testing and browser automation workflows.
+
+> **Complete Documentation**: See [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md) for full reference.
+
+### POST /api/test/upload
+
+Upload and analyze medical note files programmatically.
+
+**Authentication**: Required via `X-Test-API-Key` header
+
+**Returns**: Full analysis result as JSON with test ID for retrieval
+
+### GET /api/test/results
+
+Retrieve stored analysis results by test ID or latest result.
+
+**Authentication**: Required via `X-Test-API-Key` header
+
+### GET /api/test/health
+
+Health check endpoint for testing API availability.
+
+**Authentication**: None required
 
 ---
 

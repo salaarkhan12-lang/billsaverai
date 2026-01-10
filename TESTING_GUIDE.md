@@ -401,7 +401,35 @@ Should include:
 
 ---
 
-## 12. Automated Testing (Future Enhancement)
+## 12. Programmatic Testing
+
+### API Testing Interface
+
+For automated testing and browser automation, use the **API Testing Interface**:
+
+**Quick Start**:
+1. Navigate to [http://localhost:3000/test](http://localhost:3000/test)
+2. Enter API key from `.env.local`
+3. Provide file path to test PDF
+4. Get JSON results programmatically
+
+**Documentation**: See [API_TESTING_GUIDE.md](API_TESTING_GUIDE.md) for:
+- Complete API reference
+- Browser automation examples
+- cURL command templates
+- Authentication details
+- Troubleshooting guide
+
+**Use Cases**:
+- Automated regression testing
+- Performance benchmarking
+- Batch file processing
+- CI/CD integration
+- Automated quality assurance
+
+---
+
+## 13. Automated Testing (Future Enhancement)
 
 ### Unit Tests (Jest + React Testing Library)
 

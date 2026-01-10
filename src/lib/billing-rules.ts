@@ -5,8 +5,13 @@
 
 import { qualityPredictor, gapDetector, cptPredictor, initializeMLModels } from './ml-models';
 import type { QualityPrediction, GapPrediction, CPTCodePrediction } from './ml-models';
-import { calculateRevenue, toLegacyRevenueString, calculateTotalRevenue } from './revenue-calculator';
+import { calculateRevenue, toLegacyRevenueString, calculateTotalRevenue, calculateProcedureRevenue } from './revenue-calculator';
 import type { RevenueCalculation } from './types/revenue';
+import { getCPTCode } from './cpt-database';
+import { calculatePayerRate } from './payer-fee-schedules';
+import { isNewPatientEM, isEstablishedPatientEM, getNextEMLevel, getEMVisitType } from './cpt-helpers';
+import { validateHybrid } from './validation/hybrid-validator';
+import type { ValidationResult } from './validation/types';
 
 export interface GapLocation {
   page: number;
@@ -31,6 +36,19 @@ export interface DocumentationGap {
   mlConfidence?: number; // ML confidence score for this gap
   isMLDetected?: boolean; // Whether this gap was detected by ML
   location?: GapLocation; // Location information in the PDF
+}
+
+/**
+ * Documented billable procedure/lab/immunization
+ * Represents services that WERE performed and documented (not gaps)
+ */
+export interface DocumentedProcedure {
+  cptCode: string;
+  description: string;
+  category: 'laboratory' | 'immunization' | 'procedure';
+  revenue: number;        // Dollar amount for this service (payer-specific)
+  payerRate: number;      // Payer-specific rate
+  confidence: number;     // ML confidence (0-1)
 }
 
 export interface AnalysisResult {
@@ -61,6 +79,11 @@ export interface AnalysisResult {
       locations: number;
     }
   };
+  // NEW: Documented procedures with revenue
+  documentedProcedures?: DocumentedProcedure[];
+  totalDocumentedRevenue?: string;
+  // NEW: E/M code validation results
+  emValidation?: ValidationResult;
 }
 
 // E/M Level Requirements based on MDM (2024-2025 Guidelines)
@@ -376,6 +399,7 @@ import { DataMoatService } from './data-moat';
 export interface AnalysisOptions {
   payerId?: string;  // Payer ID (default: 'bcbs-national')
   visitsPerYear?: number;  // Estimated visits/year (default: 52)
+  extractedCPT?: Array<{ code: string; description: string; confidence: number }>;  // Extracted CPT codes from document
 }
 
 export async function analyzeDocument(
@@ -422,6 +446,33 @@ export async function analyzeDocument(
     });
   } catch (error) {
     console.warn('ML predictions failed:', error);
+  }
+
+  // Merge extracted CPT codes with ML predictions (if provided)
+  // Explicit codes from extraction take priority over ML inferences
+  if (options?.extractedCPT && options.extractedCPT.length > 0) {
+    const cptCodeMap = new Map<string, CPTCodePrediction>();
+
+    // Add ML predictions first (lower priority)
+    mlCPTPredictions.forEach(pred => cptCodeMap.set(pred.code, pred));
+
+    // Override with extracted codes (higher priority for explicit codes)
+    options.extractedCPT.forEach(extracted => {
+      // Determine category based on code pattern
+      let category: CPTCodePrediction['category'] = 'other';
+      if (/^992\d\d$/.test(extracted.code)) {
+        category = 'evaluation_management';
+      }
+
+      cptCodeMap.set(extracted.code, {
+        code: extracted.code,
+        description: extracted.description,
+        confidence: extracted.confidence,
+        category,
+      });
+    });
+
+    mlCPTPredictions = Array.from(cptCodeMap.values());
   }
 
   // Track what's found
@@ -676,25 +727,42 @@ export async function analyzeDocument(
   }
 
   if (!found.timeDocumented) {
-    // Calculate revenue impact: Potential 99213 -> 99214 if time justifies
-    const revenueCalc = calculateRevenue({
-      currentCPT: '99213',
-      potentialCPT: '99214',
-      payerId,
-      visitsPerYear,
-      confidence: 0.50,  // Lower confidence - time may or may not support upgrade
-    });
+    // Dynamic E/M upgrade detection - works for both new and established patients
+    // Find the documented E/M code from ML predictions
+    const documentedEM = mlCPTPredictions?.find(p =>
+      isNewPatientEM(p.code) || isEstablishedPatientEM(p.code)
+    );
 
-    gaps.push({
-      id: 'time-missing',
-      category: 'moderate',
-      title: 'Time Not Documented',
-      description: 'No documentation of time spent on the encounter.',
-      impact: 'Time-based billing option unavailable. May miss opportunity for higher E/M level if time exceeds MDM requirements.',
-      recommendation: 'Document total time spent on the encounter, including: reviewing records, examining patient, counseling, care coordination, and documentation. Example: "Total time: 35 minutes".',
-      potentialRevenueLoss: toLegacyRevenueString(revenueCalc),
-      revenueImpact: revenueCalc,
-    });
+    // Use documented code or fall back to 99213 (established patient level 2)
+    const currentCPT = documentedEM?.code || '99213';
+
+    // Get the next E/M level
+    const potentialCPT = getNextEMLevel(currentCPT);
+
+    // Only suggest upgrade if there's a higher level available
+    if (potentialCPT) {
+      const visitType = getEMVisitType(currentCPT);
+
+      // Calculate revenue impact: current → potential
+      const revenueCalc = calculateRevenue({
+        currentCPT,
+        potentialCPT,
+        payerId,
+        visitsPerYear,
+        confidence: 0.50,  // Lower confidence - time may or may not support upgrade
+      });
+
+      gaps.push({
+        id: 'time-missing',
+        category: 'moderate',
+        title: 'Time Not Documented',
+        description: 'No documentation of time spent on the encounter.',
+        impact: 'Time-based billing option unavailable. May miss opportunity for higher E/M level if time exceeds MDM requirements.',
+        recommendation: 'Document total time spent on the encounter, including: reviewing records, examining patient, counseling, care coordination, and documentation. Example: "Total time: 35 minutes".',
+        potentialRevenueLoss: toLegacyRevenueString(revenueCalc),
+        revenueImpact: revenueCalc,
+      });
+    } // Close if (potentialCPT)
   } else {
     strengths.push('Time documentation present');
   }
@@ -843,26 +911,109 @@ export async function analyzeDocument(
     mdmComplexity = 'Low';
   }
 
-  // Determine suggested E/M level based on MDM
+  // Determine suggested E/M level based on extracted CPT or MDM
+  // Priority: Use extracted CPT code if available, otherwise fall back to MDM analysis
   let suggestedEMLevel = '99213';
   let currentEMLevel = '99212';
+  let emValidationResult: ValidationResult | undefined;
 
-  switch (mdmComplexity) {
-    case 'High':
-      suggestedEMLevel = '99215';
-      currentEMLevel = gaps.length > 3 ? '99213' : '99214';
-      break;
-    case 'Moderate':
-      suggestedEMLevel = '99214';
-      currentEMLevel = gaps.length > 2 ? '99212' : '99213';
-      break;
-    case 'Low':
-      suggestedEMLevel = '99213';
-      currentEMLevel = gaps.length > 2 ? '99212' : '99213';
-      break;
-    default:
-      suggestedEMLevel = '99212';
-      currentEMLevel = '99212';
+  // Check if we have an extracted E/M code
+  const extractedEM = mlCPTPredictions.find(p =>
+    isNewPatientEM(p.code) || isEstablishedPatientEM(p.code)
+  );
+
+  if (extractedEM) {
+    // VALIDATE E/M CODE AGAINST DOCUMENTATION
+    const visitType = getEMVisitType(extractedEM.code);
+
+    // Only validate if visit type is determinable (new or established, not unknown)
+    if (visitType !== 'unknown') {
+      try {
+        emValidationResult = validateHybrid({
+          documentText: text,
+          claimedCode: extractedEM.code,
+          visitType, // Type is now narrowed to 'new' | 'established'
+        });
+
+        // Use validation results to set current and suggested levels
+        currentEMLevel = extractedEM.code;
+        suggestedEMLevel = emValidationResult.supportedLevel;
+
+        // CREATE GAP IF DISCREPANCY DETECTED
+        if (emValidationResult.validation && !emValidationResult.validation.isSupported) {
+          const discrepancy = emValidationResult.validation.discrepancy!;
+          const isOvercoding = discrepancy.type === 'overcoding';
+
+          // Calculate revenue impact for the discrepancy
+          let revenueCalc: RevenueCalculation | undefined;
+          try {
+            revenueCalc = calculateRevenue({
+              currentCPT: currentEMLevel,
+              potentialCPT: suggestedEMLevel,
+              payerId,
+              visitsPerYear,
+              confidence: emValidationResult.confidence,
+            });
+          } catch (error) {
+            console.warn('Revenue calculation failed for E/M validation gap:', error);
+          }
+
+          gaps.push({
+            id: isOvercoding ? 'em-overcoding' : 'em-undercoding',
+            category: isOvercoding ? (discrepancy.riskLevel === 'high' ? 'critical' : 'major') : 'moderate',
+            title: isOvercoding
+              ? `⚠️ E/M Overcoding Risk: ${currentEMLevel} → ${suggestedEMLevel}`
+              : `💰 E/M Undercoding Opportunity: ${currentEMLevel} → ${suggestedEMLevel}`,
+            description: isOvercoding
+              ? `Documentation supports ${suggestedEMLevel} but ${currentEMLevel} was claimed. ${discrepancy.auditRisk}`
+              : `Documentation supports ${suggestedEMLevel} but only ${currentEMLevel} was claimed. Revenue opportunity identified.`,
+            impact: isOvercoding
+              ? `HIGH AUDIT RISK: Overcoding by ${Math.abs(parseInt(currentEMLevel.slice(-2)) - parseInt(suggestedEMLevel.slice(-2)))} level(s). May trigger payer audit and require refunds.`
+              : `Revenue Loss: Missing $${revenueCalc?.perVisitGap.toFixed(2) || 'N/A'} per visit due to conservative coding.`,
+            recommendation: isOvercoding
+              ? `IMMEDIATE ACTION: Revise claim to ${suggestedEMLevel} or enhance documentation to support ${currentEMLevel}. Review E/M validation breakdown for specific gaps.`
+              : `Consider billing ${suggestedEMLevel} if documentation supports it. Review validation breakdown to confirm all criteria are met.`,
+            potentialRevenueLoss: revenueCalc ? toLegacyRevenueString(revenueCalc) : (isOvercoding ? 'Audit risk - potential recoupment' : 'Revenue opportunity'),
+            revenueImpact: revenueCalc,
+            cptCodes: [currentEMLevel, suggestedEMLevel],
+            mlConfidence: emValidationResult.confidence,
+          });
+        } else if (emValidationResult.validation?.isSupported) {
+          // Documentation supports claimed code - add as strength
+          strengths.push(`E/M level ${currentEMLevel} supported by documentation (${(emValidationResult.confidence * 100).toFixed(0)}% confidence)`);
+        }
+      } catch (error) {
+        console.warn('E/M validation failed:', error);
+        // Fall back to existing logic if validation fails
+        currentEMLevel = extractedEM.code;
+        const nextLevel = getNextEMLevel(currentEMLevel);
+        suggestedEMLevel = nextLevel || currentEMLevel;
+      }
+    } else {
+      // Visit type is unknown - fall back to next level logic
+      currentEMLevel = extractedEM.code;
+      const nextLevel = getNextEMLevel(currentEMLevel);
+      suggestedEMLevel = nextLevel || currentEMLevel;
+    }
+  } else {
+    // Fallback to MDM-based determination (established patient codes only)
+    switch (mdmComplexity) {
+      case 'High':
+        suggestedEMLevel = '99215';
+        currentEMLevel = gaps.length > 3 ? '99213' : '99214';
+        break;
+      case 'Moderate':
+        suggestedEMLevel = '99214';
+        currentEMLevel = gaps.length > 2 ? '99212' : '99213';
+        break;
+      case 'Low':
+        suggestedEMLevel = '99213';
+        currentEMLevel = gaps.length > 2 ? '99212' : '99213';
+        break;
+      default:
+        suggestedEMLevel = '99212';
+        currentEMLevel = '99212';
+    }
   }
 
   // Calculate overall score (hybrid rule-based + ML)
@@ -935,6 +1086,34 @@ export async function analyzeDocument(
   // Combine totals
   const combinedTotal = totalAnnualLoss + legacyLoss;
 
+  // Process ML-detected procedures (labs, immunizations, procedures)
+  // These are DOCUMENTED services, not gaps - they represent confirmed billable revenue
+  const documentedProcedures: DocumentedProcedure[] = [];
+  let totalDocumentedRevenue = 0;
+
+  if (mlCPTPredictions && mlCPTPredictions.length > 0) {
+    for (const prediction of mlCPTPredictions) {
+      const code = getCPTCode(prediction.code);
+
+      // Only process non-E/M codes (procedures, labs, immunizations)
+      // E/M codes are handled separately through gap analysis
+      if (code && (code.category === 'laboratory' || code.category === 'immunization' || code.category === 'procedure')) {
+        const payerRate = calculatePayerRate(prediction.code, payerId);
+
+        documentedProcedures.push({
+          cptCode: prediction.code,
+          description: prediction.description,
+          category: prediction.category as 'laboratory' | 'immunization' | 'procedure',
+          revenue: payerRate,
+          payerRate,
+          confidence: prediction.confidence,
+        });
+
+        totalDocumentedRevenue += payerRate;
+      }
+    }
+  }
+
   return {
     overallScore: score,
     documentationLevel,
@@ -962,6 +1141,9 @@ export async function analyzeDocument(
         identifiers: sanitizationResult.stats.identifiersRemoved,
         locations: sanitizationResult.stats.locationsRemoved
       }
-    }
+    },
+    // Documented procedures (billable services found in the note)
+    documentedProcedures: documentedProcedures.length > 0 ? documentedProcedures : undefined,
+    totalDocumentedRevenue: documentedProcedures.length > 0 ? `$${Math.round(totalDocumentedRevenue).toLocaleString()}` : undefined,
   };
 }

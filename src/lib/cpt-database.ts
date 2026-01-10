@@ -15,6 +15,8 @@ export type CPTCategory =
     | 'chronic-care'
     | 'transitional-care'
     | 'procedure'
+    | 'laboratory'
+    | 'immunization'
     | 'consultation';
 
 export interface CPTCode {
@@ -320,6 +322,126 @@ export const CPT_CODES: Record<string, CPTCode> = {
         description: 'Office consultation, level 5 (not covered by Medicare)',
         category: 'consultation',
         baseRate: 0.00,
+    },
+
+    // ============================================================================
+    // LABORATORY CODES
+    // Common lab tests with Medicare 2024 rates
+    // ============================================================================
+    '80053': {
+        code: '80053',
+        description: 'Comprehensive Metabolic Panel (CMP)',
+        category: 'laboratory',
+        baseRate: 14.00,
+        rvu: 0.15,
+    },
+    '80061': {
+        code: '80061',
+        description: 'Lipid Panel',
+        category: 'laboratory',
+        baseRate: 18.00,
+        rvu: 0.19,
+    },
+    '85025': {
+        code: '85025',
+        description: 'Complete Blood Count (CBC) with Differential',
+        category: 'laboratory',
+        baseRate: 10.00,
+        rvu: 0.11,
+    },
+    '81001': {
+        code: '81001',
+        description: 'Urinalysis, Automated with Microscopy',
+        category: 'laboratory',
+        baseRate: 3.50,
+        rvu: 0.04,
+    },
+    '84443': {
+        code: '84443',
+        description: 'Thyroid Stimulating Hormone (TSH)',
+        category: 'laboratory',
+        baseRate: 25.00,
+        rvu: 0.27,
+    },
+    '82947': {
+        code: '82947',
+        description: 'Glucose, Blood Quantitative',
+        category: 'laboratory',
+        baseRate: 3.00,
+        rvu: 0.03,
+    },
+
+    // ============================================================================
+    // IMMUNIZATION ADMINISTRATION CODES
+    // Vaccine administration fees (vaccine cost billed separately)
+    // ============================================================================
+    '90471': {
+        code: '90471',
+        description: 'Immunization Administration, First Vaccine',
+        category: 'immunization',
+        baseRate: 23.00,
+        rvu: 0.25,
+    },
+    '90472': {
+        code: '90472',
+        description: 'Immunization Administration, Each Additional Vaccine',
+        category: 'immunization',
+        baseRate: 18.00,
+        rvu: 0.19,
+    },
+    '90473': {
+        code: '90473',
+        description: 'Oral/Nasal Immunization Administration',
+        category: 'immunization',
+        baseRate: 20.00,
+        rvu: 0.21,
+    },
+
+    // ============================================================================
+    // MINOR PROCEDURES
+    // Common in-office procedures
+    // ============================================================================
+    '12001': {
+        code: '12001',
+        description: 'Simple Repair Superficial Wounds (2.5cm or less)',
+        category: 'procedure',
+        baseRate: 125.00,
+        rvu: 1.43,
+    },
+    '12002': {
+        code: '12002',
+        description: 'Simple Repair Superficial Wounds (2.6-7.5cm)',
+        category: 'procedure',
+        baseRate: 158.00,
+        rvu: 1.83,
+    },
+    '17000': {
+        code: '17000',
+        description: 'Destruction Benign Lesion (First Lesion)',
+        category: 'procedure',
+        baseRate: 95.00,
+        rvu: 1.08,
+    },
+    '17110': {
+        code: '17110',
+        description: 'Destruction Benign Lesion, 1-14 Lesions',
+        category: 'procedure',
+        baseRate: 110.00,
+        rvu: 1.25,
+    },
+    '69210': {
+        code: '69210',
+        description: 'Removal Impacted Cerumen, One or Both Ears',
+        category: 'procedure',
+        baseRate: 65.00,
+        rvu: 0.74,
+    },
+    '96372': {
+        code: '96372',
+        description: 'Therapeutic/Diagnostic Injection (IM/SC)',
+        category: 'procedure',
+        baseRate: 25.00,
+        rvu: 0.27,
     },
 };
 
