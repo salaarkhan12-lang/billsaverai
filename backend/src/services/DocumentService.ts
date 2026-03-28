@@ -1,10 +1,8 @@
-// Document service for managing medical document uploads and metadata
-// Handles file storage, validation, and document lifecycle
-
 import { AppDataSource } from '../config/database';
 import { Document, DocumentStatus, DocumentType } from '../entities/Document';
 import { User } from '../entities/User';
 import { AnalysisResult } from '../entities/AnalysisResult';
+import { EncryptionService } from './EncryptionService';
 import crypto from 'crypto';
 import fs from 'fs/promises';
 import path from 'path';
@@ -40,7 +38,7 @@ export interface DocumentValidationResult {
 
 export class DocumentService {
   private static readonly UPLOAD_DIR = process.env.UPLOAD_DIR || 'uploads';
-  private static readonly MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '10485760'); // 10MB
+  private static readonly MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '10485760');
   private static readonly ALLOWED_MIME_TYPES = [
     'application/pdf',
     'text/plain',
@@ -51,9 +49,6 @@ export class DocumentService {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ];
 
-  /**
-   * Validates document before upload
-   */
   async validateDocument(
     file: MulterFile,
     userId: string
@@ -61,24 +56,19 @@ export class DocumentService {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    // Check file size
     if (file.size > DocumentService.MAX_FILE_SIZE) {
       errors.push(`File size ${file.size} exceeds maximum allowed size ${DocumentService.MAX_FILE_SIZE}`);
     }
 
-    // Check MIME type
     if (!DocumentService.ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       errors.push(`File type ${file.mimetype} is not allowed`);
     }
 
-    // Check for empty files
     if (file.size === 0) {
       errors.push('File is empty');
     }
 
-    // Basic content validation
     try {
-      // For PDFs, we could add more sophisticated validation here
       if (file.mimetype === 'application/pdf') {
         if (!file.buffer.slice(0, 4).equals(Buffer.from('%PDF'))) {
           errors.push('File does not appear to be a valid PDF');
@@ -88,7 +78,6 @@ export class DocumentService {
       warnings.push('Could not perform content validation');
     }
 
-    // Check user permissions (placeholder for future RBAC)
     const user = await AppDataSource.getRepository(User).findOne({
       where: { id: userId }
     });
@@ -110,9 +99,6 @@ export class DocumentService {
     };
   }
 
-  /**
-   * Uploads and stores a document
-   */
   async uploadDocument(
     file: MulterFile,
     userId: string,
@@ -122,28 +108,23 @@ export class DocumentService {
       analysisRequested?: boolean;
     } = {}
   ): Promise<DocumentUploadResult> {
-    // Validate the document first
     const validation = await this.validateDocument(file, userId);
     if (!validation.isValid) {
       throw new Error(`Document validation failed: ${validation.errors.join(', ')}`);
     }
 
-    // Generate unique filename and compute checksum
     const fileId = crypto.randomUUID();
     const fileExtension = path.extname(file.originalname || 'unknown');
     const uniqueFileName = `${fileId}${fileExtension}`;
     const checksum = crypto.createHash('sha256').update(file.buffer).digest('hex');
 
-    // Determine upload path
     const uploadPath = path.join(DocumentService.UPLOAD_DIR, userId, uniqueFileName);
-
-    // Ensure upload directory exists
     await fs.mkdir(path.dirname(uploadPath), { recursive: true });
 
-    // Write file to disk
-    await fs.writeFile(uploadPath, file.buffer);
+    const encryptionService = new EncryptionService();
+    const encrypted = await encryptionService.encryptBuffer(file.buffer);
+    await fs.writeFile(uploadPath, encrypted.ciphertext);
 
-    // Create document record
     const documentRepo = AppDataSource.getRepository(Document);
     const document = documentRepo.create({
       userId,
@@ -155,7 +136,9 @@ export class DocumentService {
       documentType: metadata.documentType || DocumentType.MEDICAL_NOTE,
       status: metadata.analysisRequested ? DocumentStatus.PROCESSING : DocumentStatus.UPLOADED,
       checksum,
-      isEncrypted: false, // Files are stored unencrypted on disk, analysis results are encrypted
+      isEncrypted: true,
+      encryptionKeySalt: encrypted.salt,
+      encryptionIv: encrypted.iv
     });
 
     const savedDocument = await documentRepo.save(document);
@@ -167,9 +150,6 @@ export class DocumentService {
     };
   }
 
-  /**
-   * Retrieves a document by ID
-   */
   async getDocument(userId: string, documentId: string): Promise<Document | null> {
     const documentRepo = AppDataSource.getRepository(Document);
     return documentRepo.findOne({
@@ -178,9 +158,6 @@ export class DocumentService {
     });
   }
 
-  /**
-   * Lists documents for a user
-   */
   async listUserDocuments(
     userId: string,
     options: {
@@ -219,9 +196,6 @@ export class DocumentService {
     return queryBuilder.getMany();
   }
 
-  /**
-   * Downloads a document file
-   */
   async downloadDocument(userId: string, documentId: string): Promise<Buffer | null> {
     const document = await this.getDocument(userId, documentId);
     if (!document || !document.filePath) {
@@ -229,181 +203,42 @@ export class DocumentService {
     }
 
     try {
-      return await fs.readFile(document.filePath);
+      const ciphertext = await fs.readFile(document.filePath);
+      if (!document.isEncrypted || !document.encryptionKeySalt || !document.encryptionIv) {
+        return null;
+      }
+      const encService = new EncryptionService();
+      return await encService.decryptBuffer(ciphertext, document.encryptionKeySalt, document.encryptionIv, document.encryptionAuthTag || '');
     } catch (error) {
       console.error('Failed to read document file:', error);
       return null;
     }
   }
 
-  /**
-   * Updates document status
-   */
   async updateDocumentStatus(
     userId: string,
     documentId: string,
     status: DocumentStatus,
-    additionalData?: {
-      analyzedAt?: Date;
-      analysisError?: string;
-      metadata?: Record<string, any>;
-    }
+    analysisResultId?: string,
+    analysisError?: string
   ): Promise<Document | null> {
     const documentRepo = AppDataSource.getRepository(Document);
-    const document = await documentRepo.findOne({
-      where: { id: documentId, userId }
-    });
-
-    if (!document) {
-      return null;
-    }
+    const document = await this.getDocument(userId, documentId);
+    if (!document) return null;
 
     document.status = status;
+    document.analyzedAt = status === DocumentStatus.ANALYZED ? new Date() : document.analyzedAt;
+    document.analysisError = analysisError;
 
-    if (additionalData) {
-      if (additionalData.analyzedAt) document.analyzedAt = additionalData.analyzedAt;
-      if (additionalData.analysisError) document.analysisError = additionalData.analysisError;
-      if (additionalData.metadata) {
-        document.metadata = { ...document.metadata, ...additionalData.metadata };
+    if (analysisResultId) {
+      const analysisResultRepo = AppDataSource.getRepository(AnalysisResult);
+      const analysisResult = await analysisResultRepo.findOne({ where: { id: analysisResultId } });
+      if (analysisResult) {
+        document.analysisResults = document.analysisResults || [];
+        document.analysisResults.push(analysisResult);
       }
     }
 
     return documentRepo.save(document);
-  }
-
-  /**
-   * Deletes a document and its file
-   */
-  async deleteDocument(userId: string, documentId: string): Promise<boolean> {
-    const documentRepo = AppDataSource.getRepository(Document);
-    const analysisResultRepo = AppDataSource.getRepository(AnalysisResult);
-
-    // Find the document
-    const document = await documentRepo.findOne({
-      where: { id: documentId, userId },
-      relations: ['analysisResults']
-    });
-
-    if (!document) {
-      return false;
-    }
-
-    // Delete associated analysis results
-    if (document.analysisResults && document.analysisResults.length > 0) {
-      await analysisResultRepo.delete({ documentId: documentId });
-    }
-
-    // Delete the file if it exists
-    if (document.filePath) {
-      try {
-        await fs.unlink(document.filePath);
-      } catch (error) {
-        console.warn('Failed to delete document file:', error);
-        // Continue with database deletion even if file deletion fails
-      }
-    }
-
-    // Delete the document record
-    await documentRepo.delete({ id: documentId, userId });
-
-    return true;
-  }
-
-  /**
-   * Gets document statistics for a user
-   */
-  async getDocumentStats(userId: string): Promise<{
-    totalDocuments: number;
-    documentsByStatus: Record<DocumentStatus, number>;
-    documentsByType: Record<DocumentType, number>;
-    totalSize: number;
-    analyzedDocuments: number;
-  }> {
-    const documents = await this.listUserDocuments(userId);
-
-    const stats = {
-      totalDocuments: documents.length,
-      documentsByStatus: {} as Record<DocumentStatus, number>,
-      documentsByType: {} as Record<DocumentType, number>,
-      totalSize: 0,
-      analyzedDocuments: 0
-    };
-
-    documents.forEach(doc => {
-      // Count by status
-      stats.documentsByStatus[doc.status] = (stats.documentsByStatus[doc.status] || 0) + 1;
-
-      // Count by type
-      stats.documentsByType[doc.documentType] = (stats.documentsByType[doc.documentType] || 0) + 1;
-
-      // Sum file sizes
-      stats.totalSize += doc.fileSize;
-
-      // Count analyzed documents
-      if (doc.isAnalyzed) {
-        stats.analyzedDocuments++;
-      }
-    });
-
-    return stats;
-  }
-
-  /**
-   * Searches documents by filename or metadata
-   */
-  async searchDocuments(
-    userId: string,
-    query: string,
-    options: {
-      limit?: number;
-      searchInContent?: boolean; // Future: search in extracted text
-    } = {}
-  ): Promise<Document[]> {
-    const documentRepo = AppDataSource.getRepository(Document);
-    const searchQuery = `%${query.toLowerCase()}%`;
-
-    const queryBuilder = documentRepo.createQueryBuilder('doc')
-      .where('doc.userId = :userId', { userId })
-      .andWhere('(LOWER(doc.fileName) LIKE :query OR LOWER(doc.originalFileName) LIKE :query)')
-      .setParameters({ query: searchQuery })
-      .orderBy('doc.createdAt', 'DESC');
-
-    if (options.limit) {
-      queryBuilder.limit(options.limit);
-    }
-
-    return queryBuilder.getMany();
-  }
-
-  /**
-   * Cleans up old temporary files and failed uploads
-   */
-  async cleanupOldFiles(maxAgeDays: number = 7): Promise<number> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
-
-    const documentRepo = AppDataSource.getRepository(Document);
-    const oldDocuments = await documentRepo.find({
-      where: {
-        status: DocumentStatus.FAILED,
-        createdAt: { $lt: cutoffDate } as any // TypeORM date comparison
-      }
-    });
-
-    let deletedCount = 0;
-
-    for (const doc of oldDocuments) {
-      if (doc.filePath) {
-        try {
-          await fs.unlink(doc.filePath);
-          deletedCount++;
-        } catch (error) {
-          console.warn(`Failed to delete old file ${doc.filePath}:`, error);
-        }
-      }
-      await documentRepo.delete({ id: doc.id });
-    }
-
-    return deletedCount;
   }
 }

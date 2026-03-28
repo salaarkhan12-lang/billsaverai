@@ -24,6 +24,10 @@ node_modules
 .DS_Store
 *.pem
 
+audit.log.enc
+.local-model
+backend/.env
+
 # Test scripts and temporary files
 test-*.js
 test-*.html

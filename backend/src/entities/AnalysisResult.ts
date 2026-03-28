@@ -23,55 +23,34 @@ export class AnalysisResult {
 
   @Column({ type: 'uuid', nullable: true })
   @Index()
-  documentId?: string; // Optional link to uploaded document
+  documentId?: string;
 
   @Column({ type: 'text' })
-  encryptedData!: string; // Encrypted JSON string containing AnalysisResult
+  encryptedData!: string;
 
   @Column({ type: 'text' })
-  dataHash!: string; // SHA-256 hash of decrypted data for integrity verification
+  dataHash!: string;
 
   @Column({ type: 'text' })
-  encryptionKeySalt!: string; // Salt used for key derivation
+  encryptionKeySalt!: string;
 
   @Column({ type: 'text' })
-  encryptionIv!: string; // Initialization vector for AES-GCM
+  encryptionIv!: string;
 
   @Column({ type: 'text', nullable: true })
-  encryptionAuthTag?: string; // Authentication tag for AES-GCM
+  encryptionAuthTag?: string;
 
   @Column({ type: 'enum', enum: AnalysisStatus, default: AnalysisStatus.PENDING })
   status!: AnalysisStatus;
 
-  @Column({ type: 'int', nullable: true })
-  overallScore?: number; // Cached score for queries (not encrypted)
-
-  @Column({ length: 50, nullable: true })
-  documentationLevel?: string; // Cached level for queries (not encrypted)
-
-  @Column({ type: 'text', nullable: true })
-  totalPotentialRevenueLoss?: string; // Cached revenue loss for queries (not encrypted)
-
-  @Column({ type: 'text', nullable: true })
-  suggestedEMLevel?: string; // Cached E/M level for queries (not encrypted)
-
   @Column({ type: 'jsonb', nullable: true })
-  searchIndex?: Record<string, any>; // Encrypted search index for gaps, diagnoses, etc.
-
-  @Column({ type: 'text', nullable: true })
-  analysisError?: string; // Error message if analysis failed
-
-  @Column({ type: 'int', nullable: true })
-  processingTimeMs?: number; // Time taken to process analysis
-
-  @Column({ type: 'jsonb', nullable: true })
-  mlMetadata?: Record<string, any>; // ML model versions, confidence scores, etc.
+  metadataSafe?: Record<string, any>;
 
   @Column({ type: 'boolean', default: false })
-  isMigrated!: boolean; // Whether this result was migrated from localStorage
+  isMigrated!: boolean;
 
   @Column({ type: 'text', nullable: true })
-  migrationSource?: string; // Source of migration (e.g., 'localStorage')
+  migrationSource?: string;
 
   @CreateDateColumn()
   createdAt!: Date;
@@ -79,7 +58,6 @@ export class AnalysisResult {
   @UpdateDateColumn()
   updatedAt!: Date;
 
-  // Relations
   @ManyToOne('User', 'analysisResults')
   @JoinColumn({ name: 'userId' })
   user!: User;
@@ -88,7 +66,6 @@ export class AnalysisResult {
   @JoinColumn({ name: 'documentId' })
   document?: Document;
 
-  // Computed properties
   get isCompleted(): boolean {
     return this.status === AnalysisStatus.COMPLETED;
   }

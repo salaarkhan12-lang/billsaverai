@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { promisify } from 'util';
 import { Repository } from 'typeorm';
 import { User, UserStatus, HealthcareRole } from '../entities/User';
 import { Session, SessionStatus } from '../entities/Session';
@@ -40,20 +41,60 @@ export interface AuthResult {
 export class AuthService {
   private userRepository: Repository<User>;
   private sessionRepository: Repository<Session>;
+  private static readonly PBKDF2_ITERATIONS = 500000;
+  private static readonly PBKDF2_DIGEST = 'sha512';
+  private static readonly PBKDF2_KEYLEN = 64;
+  private static readonly PEPPER = process.env.PBKDF2_PEPPER || '';
 
   constructor() {
     this.userRepository = AppDataSource.getRepository(User);
     this.sessionRepository = AppDataSource.getRepository(Session);
+    if (!AuthService.PEPPER) {
+      throw new Error('PBKDF2_PEPPER is required');
+    }
   }
 
-  // Traditional password-based registration (fallback)
+  private async hashPassword(password: string): Promise<string> {
+    const salt = crypto.randomBytes(16);
+    const key = await promisify(crypto.pbkdf2)(
+      password + AuthService.PEPPER,
+      salt,
+      AuthService.PBKDF2_ITERATIONS,
+      AuthService.PBKDF2_KEYLEN,
+      AuthService.PBKDF2_DIGEST
+    );
+    return `pbkdf2$${AuthService.PBKDF2_DIGEST}$${AuthService.PBKDF2_ITERATIONS}$${salt.toString('base64')}$${key.toString('base64')}`;
+  }
+
+  private async verifyPassword(password: string, stored: string): Promise<boolean> {
+    if (stored.startsWith('pbkdf2$')) {
+      const parts = stored.split('$');
+      const iterations = parseInt(parts[2], 10);
+      const salt = Buffer.from(parts[3], 'base64');
+      const expected = parts[4];
+      const derived = await promisify(crypto.pbkdf2)(
+        password + AuthService.PEPPER,
+        salt,
+        iterations,
+        AuthService.PBKDF2_KEYLEN,
+        AuthService.PBKDF2_DIGEST
+      );
+      return crypto.timingSafeEqual(Buffer.from(expected, 'base64'), derived);
+    }
+    return bcrypt.compare(password, stored);
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
   async register(data: RegisterData): Promise<Partial<User>> {
     const existingUser = await this.userRepository.findOne({ where: { email: data.email } });
     if (existingUser) {
       throw new Error('User already exists');
     }
 
-    const passwordHash = await bcrypt.hash(data.password, 12);
+    const passwordHash = await this.hashPassword(data.password);
 
     const user = this.userRepository.create({
       email: data.email,
@@ -78,7 +119,6 @@ export class AuthService {
     };
   }
 
-  // Traditional password-based login (fallback)
   async login(data: LoginData): Promise<AuthResult> {
     const user = await this.userRepository.findOne({
       where: { email: data.email }
@@ -92,7 +132,7 @@ export class AuthService {
       throw new Error('Account is temporarily locked due to failed login attempts');
     }
 
-    const isValidPassword = await bcrypt.compare(data.password, user.passwordHash);
+    const isValidPassword = await this.verifyPassword(data.password, user.passwordHash);
     if (!isValidPassword) {
       await this.handleFailedLogin(user);
       throw new Error('Invalid credentials');
@@ -117,12 +157,12 @@ export class AuthService {
     };
   }
 
-  // Refresh access token
   async refreshToken(refreshToken: string): Promise<AuthTokens> {
     try {
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any;
+      const hashed = this.hashToken(refreshToken);
       const session = await this.sessionRepository.findOne({
-        where: { id: decoded.sessionId, refreshToken, status: SessionStatus.ACTIVE },
+        where: { id: decoded.sessionId, refreshToken: hashed, status: SessionStatus.ACTIVE },
         relations: ['user']
       });
 
@@ -130,14 +170,12 @@ export class AuthService {
         throw new Error('Invalid refresh token');
       }
 
-      // Generate new tokens
       const tokens = this.generateTokens(session.user, session);
 
-      // Update session with new tokens
       session.accessToken = tokens.accessToken;
-      session.refreshToken = tokens.refreshToken;
-      session.accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-      session.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      session.refreshToken = this.hashToken(tokens.refreshToken);
+      session.accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      session.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       await this.sessionRepository.save(session);
 
@@ -147,7 +185,6 @@ export class AuthService {
     }
   }
 
-  // Logout - revoke session
   async logout(accessToken: string): Promise<void> {
     try {
       const decoded = jwt.verify(accessToken, process.env.JWT_SECRET!) as any;
@@ -162,11 +199,10 @@ export class AuthService {
         await this.sessionRepository.save(session);
       }
     } catch (error) {
-      // Token might be invalid, but we don't throw error for logout
+      // ignore invalid token on logout
     }
   }
 
-  // Verify access token
   async verifyToken(accessToken: string): Promise<{ user: User; session: Session }> {
     try {
       const decoded = jwt.verify(accessToken, process.env.JWT_SECRET!) as any;
@@ -195,9 +231,9 @@ export class AuthService {
 
     const tokens = this.generateTokens(user, session);
     session.accessToken = tokens.accessToken;
-    session.refreshToken = tokens.refreshToken;
-    session.accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-    session.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    session.refreshToken = this.hashToken(tokens.refreshToken);
+    session.accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    session.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await this.sessionRepository.save(session);
 
@@ -228,7 +264,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 15 * 60, // 15 minutes in seconds
+      expiresIn: 15 * 60,
       tokenType: 'Bearer'
     };
   }
@@ -236,9 +272,8 @@ export class AuthService {
   private async handleFailedLogin(user: User): Promise<void> {
     user.failedLoginAttempts += 1;
 
-    // Lock account after 5 failed attempts
     if (user.failedLoginAttempts >= 5) {
-      user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
     }
 
     await this.userRepository.save(user);

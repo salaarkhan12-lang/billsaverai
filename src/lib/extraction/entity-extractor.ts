@@ -357,6 +357,14 @@ function extractFromSentence(
     const entities: MedicalEntity[] = [];
     const text = span.text.toLowerCase();
 
+    // Skip MIPS procedure order lines - these contain measure applicability tags, not diagnoses
+    // Pattern: Lines starting with MIPS codes like (3074F), (3078F), (ZD1E3), etc.
+    // These contain text like "(DM), (HTN, CKD, CAD)" which are NOT patient diagnoses
+    const isMIPSProcedureLine = /^\s*\([0-9A-Z]{4,5}[A-Z]?\)/.test(span.text);
+    if (isMIPSProcedureLine) {
+        return []; // Don't extract keywords from procedure order lines
+    }
+
     // Check for each medical term alias
     for (const [keyword, expansions] of Object.entries(MEDICAL_TERM_ALIASES)) {
         // Use word boundary regex to ensure keyword is standalone

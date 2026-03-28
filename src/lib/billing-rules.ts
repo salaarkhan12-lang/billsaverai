@@ -59,6 +59,7 @@ export interface AnalysisResult {
   suggestedEMLevel: string;
   currentEMLevel: string;
   potentialUpcodeOpportunity: boolean;
+  isOvercoded?: boolean; // NEW: True when claimed code exceeds documentation support
   totalPotentialRevenueLoss: string;
   mdmComplexity: 'Straightforward' | 'Low' | 'Moderate' | 'High';
   timeDocumented: boolean;
@@ -981,6 +982,20 @@ export async function analyzeDocument(
         } else if (emValidationResult.validation?.isSupported) {
           // Documentation supports claimed code - add as strength
           strengths.push(`E/M level ${currentEMLevel} supported by documentation (${(emValidationResult.confidence * 100).toFixed(0)}% confidence)`);
+
+          // Even if current level is supported, check if there's an upgrade opportunity
+          // The supported level might be higher than what was claimed
+          const supportedNumeric = parseInt(emValidationResult.supportedLevel.slice(-2));
+          const currentNumeric = parseInt(currentEMLevel.slice(-2));
+
+          if (supportedNumeric > currentNumeric) {
+            // Documentation supports a higher level than what was claimed - undercoding!
+            suggestedEMLevel = emValidationResult.supportedLevel;
+          } else {
+            // Check if next level might be reachable with minor documentation improvements
+            const nextLevel = getNextEMLevel(currentEMLevel);
+            suggestedEMLevel = nextLevel || currentEMLevel;
+          }
         }
       } catch (error) {
         console.warn('E/M validation failed:', error);
@@ -1121,7 +1136,8 @@ export async function analyzeDocument(
     strengths,
     suggestedEMLevel,
     currentEMLevel,
-    potentialUpcodeOpportunity: suggestedEMLevel !== currentEMLevel,
+    potentialUpcodeOpportunity: suggestedEMLevel !== currentEMLevel && suggestedEMLevel > currentEMLevel,
+    isOvercoded: emValidationResult?.validation?.discrepancy?.type === 'overcoding',
     totalPotentialRevenueLoss: `$${Math.round(combinedTotal).toLocaleString()}+`,
     mdmComplexity,
     timeDocumented: found.timeDocumented,
@@ -1145,5 +1161,7 @@ export async function analyzeDocument(
     // Documented procedures (billable services found in the note)
     documentedProcedures: documentedProcedures.length > 0 ? documentedProcedures : undefined,
     totalDocumentedRevenue: documentedProcedures.length > 0 ? `$${Math.round(totalDocumentedRevenue).toLocaleString()}` : undefined,
+    // E/M Validation Results
+    emValidation: emValidationResult,
   };
 }

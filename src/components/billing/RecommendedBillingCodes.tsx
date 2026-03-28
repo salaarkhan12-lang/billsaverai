@@ -7,6 +7,8 @@ import type { AnalysisResult } from "@/lib/billing-rules";
 import { analyzeBillingCodes, type CPTCode, type ICD10Code } from "@/lib/billing-code-analyzer";
 import { ConfidenceBadge, ReasoningSection, ConfidenceMeter } from "./ConfidenceBadge";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { RiskAdjustmentDashboard } from "./RiskAdjustmentDashboard";
+import { ICD10_DATABASE } from "@/lib/icd10-database";
 
 interface RecommendedBillingCodesProps {
     analysisResult: AnalysisResult;
@@ -51,6 +53,33 @@ export function RecommendedBillingCodes({ analysisResult, onGapClick }: Recommen
                     CPT Procedure Codes
                 </h3>
 
+                {/* Overcoding Warning */}
+                {billingAnalysis.cptCodes.overcoded && (
+                    <div className="mb-4">
+                        <p className="text-red-400 text-sm mb-2 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Claimed Code (OVERCODING RISK)
+                        </p>
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-white font-mono text-lg font-bold">{billingAnalysis.cptCodes.overcoded.code}</span>
+                                        <span className="px-2 py-0.5 bg-red-500/20 text-red-300 border border-red-500/30 text-[10px] font-bold uppercase rounded">
+                                            ⚠️ Not Supported
+                                        </span>
+                                    </div>
+                                    <p className="text-white/70 text-sm mb-1">{billingAnalysis.cptCodes.overcoded.description}</p>
+                                    <p className="text-red-300/70 font-mono text-sm">{billingAnalysis.cptCodes.overcoded.reimbursement}</p>
+                                    <p className="text-red-400 text-xs mt-2">⚠️ This code exceeds documentation support. Consider downcoding to avoid audit risk.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Currently Billable */}
                 <div className="mb-4">
                     <p className="text-white/60 text-sm mb-2">Currently Billable (Based on Documentation)</p>
@@ -70,6 +99,107 @@ export function RecommendedBillingCodes({ analysisResult, onGapClick }: Recommen
                                 <CPTCodeCard key={cpt.code} code={cpt} onGapClick={onGapClick} />
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* Upgrade Guidance - How to achieve higher level */}
+                {billingAnalysis.upgradeGuidance && (
+                    <div className="mt-4 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-xl p-4">
+                        <p className="text-emerald-400 text-sm mb-3 flex items-center gap-2 font-medium">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                            How to Bill Higher: {billingAnalysis.upgradeGuidance.currentCode} → {billingAnalysis.upgradeGuidance.targetCode}
+                        </p>
+
+                        <div className="bg-black/20 rounded-lg p-3 mb-3">
+                            <div className="flex justify-between items-center">
+                                <span className="text-white/70 text-sm">Potential Revenue Increase:</span>
+                                <span className="text-emerald-400 font-bold text-lg">
+                                    +${billingAnalysis.upgradeGuidance.revenueIncrease}/visit
+                                </span>
+                            </div>
+                            <p className="text-white/50 text-xs mt-1">
+                                Annual impact: +${(billingAnalysis.upgradeGuidance.revenueIncrease * 52).toLocaleString()}+ (at 1 visit/week)
+                            </p>
+                        </div>
+
+                        {/* MDM Requirements Summary */}
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                            <div className={`text-center p-2 rounded-lg ${billingAnalysis.upgradeGuidance.requirements.problems.met ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
+                                <p className="text-[10px] text-white/50 uppercase">Problems</p>
+                                <p className="text-xs text-white font-medium">
+                                    {billingAnalysis.upgradeGuidance.requirements.problems.met ? '✓' : '○'} {billingAnalysis.upgradeGuidance.requirements.problems.currentLevel}
+                                </p>
+                            </div>
+                            <div className={`text-center p-2 rounded-lg ${billingAnalysis.upgradeGuidance.requirements.data.met ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
+                                <p className="text-[10px] text-white/50 uppercase">Data</p>
+                                <p className="text-xs text-white font-medium">
+                                    {billingAnalysis.upgradeGuidance.requirements.data.met ? '✓' : '○'} {billingAnalysis.upgradeGuidance.requirements.data.currentLevel}
+                                </p>
+                            </div>
+                            <div className={`text-center p-2 rounded-lg ${billingAnalysis.upgradeGuidance.requirements.risk.met ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-yellow-500/10 border border-yellow-500/20'}`}>
+                                <p className="text-[10px] text-white/50 uppercase">Risk</p>
+                                <p className="text-xs text-white font-medium">
+                                    {billingAnalysis.upgradeGuidance.requirements.risk.met ? '✓' : '○'} {billingAnalysis.upgradeGuidance.requirements.risk.currentLevel}
+                                </p>
+                            </div>
+                        </div>
+
+                        <p className="text-white/50 text-xs mb-2">
+                            Need 2 of 3 MDM elements at "{billingAnalysis.upgradeGuidance.targetLevel}" level.
+                            Currently: {billingAnalysis.upgradeGuidance.requirements.elementsMet}/3 met.
+                        </p>
+
+                        {/* Recommendations */}
+                        {billingAnalysis.upgradeGuidance.recommendations.length > 0 && (
+                            <div className="mt-3">
+                                <p className="text-white/70 text-xs font-medium mb-2">Recommended Documentation Improvements:</p>
+                                <div className="space-y-2">
+                                    {billingAnalysis.upgradeGuidance.recommendations.slice(0, 3).map((rec) => (
+                                        <div key={rec.id} className={`p-2 rounded-lg border ${rec.priority === 'high' ? 'bg-emerald-500/10 border-emerald-500/30' :
+                                            rec.priority === 'medium' ? 'bg-blue-500/10 border-blue-500/30' :
+                                                'bg-white/5 border-white/10'
+                                            }`}>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${rec.category === 'problem' ? 'bg-purple-500/20 text-purple-300' :
+                                                    rec.category === 'data' ? 'bg-blue-500/20 text-blue-300' :
+                                                        'bg-orange-500/20 text-orange-300'
+                                                    }`}>
+                                                    {rec.category}
+                                                </span>
+                                                <span className="text-white text-xs font-medium">{rec.title}</span>
+                                            </div>
+                                            <p className="text-white/60 text-xs">{rec.description}</p>
+                                            {rec.examplePhrases.length > 0 && (
+                                                <div className="mt-1.5 bg-black/20 rounded p-1.5">
+                                                    <p className="text-white/40 text-[10px] mb-0.5">Example:</p>
+                                                    <p className="text-emerald-300/80 text-xs italic">"{rec.examplePhrases[0]}"</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Time Conflict Warning */}
+                {billingAnalysis.timeConflict?.hasConflict && (
+                    <div className="mt-4 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                        <p className="text-orange-400 text-sm flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Time Documentation Conflict
+                        </p>
+                        <p className="text-white/70 text-xs mt-1">{billingAnalysis.timeConflict.details}</p>
+                        {billingAnalysis.timeConflict.supportedCode && (
+                            <p className="text-orange-300/80 text-xs mt-1">
+                                Time supports: <span className="font-bold">{billingAnalysis.timeConflict.supportedCode}</span>
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
@@ -111,6 +241,23 @@ export function RecommendedBillingCodes({ analysisResult, onGapClick }: Recommen
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* Risk Adjustment Dashboard */}
+            <div className="mt-8 pt-8 border-t border-white/10">
+                <h3 className="text-white font-semibold mb-6 flex items-center gap-2">
+                    <span className="text-2xl">🎯</span>
+                    Risk Adjustment & MIPS Analysis
+                </h3>
+                <RiskAdjustmentDashboard
+                    documentText={analysisResult.documentText || ''}
+                    documentedCodes={billingAnalysis.icdCodes.documented.map(c => c.code)}
+                    conditions={billingAnalysis.icdCodes.documented.map(icd => ({
+                        code: icd.code,
+                        description: icd.description,
+                        isHCC: icd.isHCC || (ICD10_DATABASE[icd.code]?.isHCC ?? false),
+                    }))}
+                />
             </div>
         </div>
     );
