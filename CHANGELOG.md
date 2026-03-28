@@ -136,6 +136,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## v1.8.0 — Security & Claims Alignment
+- Implemented PBKDF2 (sha512, 500k) + PEPPER; legacy bcrypt fallback only.
+- Encrypted document uploads/results with AES-256-GCM; isEncrypted true; removed cleartext score/level/revenue columns.
+- Encrypted, tamper-evident audit logging; hashed refresh tokens.
+- Enforced healthcare-role RBAC on document/analysis/feedback routes.
+- Added metadata-only sync option with PHI rejection.
+- Added feedback loop (non-PHI) and tfjs incremental training; ml:retrain-local script.
+- Docs updated to reflect true security posture and capabilities.
+
 ## [1.3.0] - 2026-01-07
 
 ### 🔒 Major Security Hardening Release
