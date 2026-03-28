@@ -13,6 +13,10 @@ on:
       - 'backend/**'
       - 'infrastructure/**'
 
+permissions:
+  contents: read
+  security-events: write
+
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: billsaver-backend
@@ -24,6 +28,9 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
