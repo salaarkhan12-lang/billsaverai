@@ -18,6 +18,9 @@ env:
   ECR_REPOSITORY: billsaver-backend
   TERRAFORM_VERSION: 1.5.0
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # Security and Compliance Checks
   security-scan:
@@ -36,7 +39,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
